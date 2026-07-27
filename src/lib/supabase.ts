@@ -1,10 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Retrieve credentials from Vite env or localStorage override
+// Deine festen Supabase-Standardwerte
+const DEFAULT_URL = 'https://yvwgdhznhhaforfnyjjx.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2d2dkaHpuaGhhZm9yZm55amp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxODQ0MjcsImV4cCI6MjEwMDc2MDQyN30._mp1jB3SA6olmWPxD9fNOh5GwWwtRICn8G_XSqEAJhQ';
+
+// Retrieve credentials from Vite env, localStorage override, or fall back to defaults
 const getSupabaseConfig = () => {
   const metaEnv = (import.meta as any).env || {};
-  const envUrl = metaEnv.VITE_SUPABASE_URL || '';
-  const envKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  const envUrl = metaEnv.VITE_SUPABASE_URL || DEFAULT_URL;
+  const envKey = metaEnv.VITE_SUPABASE_ANON_KEY || DEFAULT_KEY;
   
   const localUrl = localStorage.getItem('parkplatz_supabase_url') || envUrl;
   const localKey = localStorage.getItem('parkplatz_supabase_key') || envKey;
