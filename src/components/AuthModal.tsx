@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, Database, CheckCircle2, AlertCircle } from 'lucide-react';
-import { isSupabaseConfigured, saveSupabaseConfig, clearSupabaseConfig, config } from '../lib/supabase';
+import { X, Lock, Mail, User, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -16,25 +15,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   if (!isOpen) return null;
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('philip.s@parkplatz.de');
-  const [password, setPassword] = useState('pass1234');
-  const [name, setName] = useState('Philip Schüßler');
-  const [zipCode, setZipCode] = useState('60329');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [zipCode, setZipCode] = useState('');
   
   // Verification notice banner state
   const [showVerificationBanner, setShowVerificationBanner] = useState(false);
-  const [showSupabaseSettings, setShowSupabaseSettings] = useState(false);
-  const [customSupabaseUrl, setCustomSupabaseUrl] = useState(config.url || '');
-  const [customSupabaseKey, setCustomSupabaseKey] = useState(config.key || '');
 
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (mode === 'register') {
       setShowVerificationBanner(true);
-      // Logged in with email verification needed
       onLoginSuccess({
-        name: name.trim() || 'Philip Schüßler',
+        name: name.trim() || 'Neuer Nutzer',
         email: email.trim(),
         isEmailVerified: false,
         zipCode: zipCode.trim() || '60329',
@@ -42,19 +37,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } else {
       // Login
       onLoginSuccess({
-        name: email.includes('philip') ? 'Philip Schüßler' : name.trim() || 'Nutzer',
+        name: name.trim() || email.split('@')[0] || 'Nutzer',
         email: email.trim(),
         isEmailVerified: true,
-        zipCode: '60329',
+        zipCode: zipCode.trim() || '60329',
       });
       onClose();
-    }
-  };
-
-  const handleSaveSupabase = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customSupabaseUrl && customSupabaseKey) {
-      saveSupabaseConfig(customSupabaseUrl.trim(), customSupabaseKey.trim());
     }
   };
 
@@ -66,7 +54,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="bg-[#22262d] text-white p-4 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#86b817]" />
-            <h3 className="font-bold text-sm">Sicherer Supabase Auth Zugang</h3>
+            <h3 className="font-bold text-sm">Meinparkplatz – Anmelden oder Registrieren</h3>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-white rounded-lg">
             <X className="w-5 h-5" />
@@ -78,7 +66,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             onClick={() => { setMode('login'); setShowVerificationBanner(false); }}
             className={`flex-1 py-3 transition-colors ${
-              mode === 'login' ? 'bg-white text-[#86b817] border-b-2 border-[#86b817]' : 'hover:bg-gray-100'
+              mode === 'login' ? 'bg-white text-[#86b817] border-b-2 border-[#86b817]' : 'hover:bg-gray-100 text-gray-600'
             }`}
           >
             Anmelden / Login
@@ -86,7 +74,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             onClick={() => { setMode('register'); setShowVerificationBanner(false); }}
             className={`flex-1 py-3 transition-colors ${
-              mode === 'register' ? 'bg-white text-[#86b817] border-b-2 border-[#86b817]' : 'hover:bg-gray-100'
+              mode === 'register' ? 'bg-white text-[#86b817] border-b-2 border-[#86b817]' : 'hover:bg-gray-100 text-gray-600'
             }`}
           >
             Registrieren (Kostenlos)
@@ -111,13 +99,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 block">Dein Name / Anzeigename</label>
+                <label className="text-xs font-bold text-gray-700 block">Dein Name / Inserenten-Name *</label>
                 <div className="relative flex items-center">
                   <User className="w-4 h-4 text-gray-400 absolute left-3" />
                   <input
                     type="text"
                     required
-                    placeholder="Philip Schüßler"
+                    placeholder="z.B. Max Mustermann"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full bg-gray-50 border border-gray-300 rounded-xl pl-9 pr-3 py-2.5 text-xs text-gray-900 outline-none focus:border-[#86b817]"
@@ -126,11 +114,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-700 block">PLZ für Standortsuche</label>
+                <label className="text-xs font-bold text-gray-700 block">PLZ deines Standorts *</label>
                 <input
                   type="text"
                   required
-                  placeholder="60329"
+                  placeholder="z.B. 60329"
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl p-2.5 text-xs text-gray-900 outline-none focus:border-[#86b817]"
@@ -171,85 +159,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             type="submit"
-            className="w-full bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold py-3 rounded-xl shadow-md transition-colors text-sm"
+            className="w-full bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold py-3 rounded-xl shadow-md transition-colors text-sm mt-2"
           >
             {mode === 'login' ? 'Jetzt Anmelden' : 'Kostenloses Konto erstellen'}
           </button>
 
-          {/* Quick Demo Login Button for easy testing */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                onLoginSuccess({
-                  name: 'Philip Schüßler',
-                  email: 'philip.s@parkplatz.de',
-                  isEmailVerified: true,
-                  zipCode: '60329',
-                });
-                onClose();
-              }}
-              className="w-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>⚡ Mit 1-Klick als Test-Inhaber (Philip Schüßler) anmelden</span>
-            </button>
+          {/* Privacy Footnote */}
+          <div className="pt-2 text-center text-[11px] text-gray-400 flex items-center justify-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Sicher & verschlüsselt nach DSGVO Standards</span>
           </div>
-
-          {/* Supabase Status Button */}
-          <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-gray-600">
-              <Database className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Supabase Status:</span>
-              <strong className={isSupabaseConfigured() ? 'text-emerald-700' : 'text-amber-600'}>
-                {isSupabaseConfigured() ? 'Aktiv Verbunden' : 'Lokal / Standard'}
-              </strong>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowSupabaseSettings(!showSupabaseSettings)}
-              className="text-gray-500 hover:text-gray-900 font-semibold underline text-[11px]"
-            >
-              API Keys
-            </button>
-          </div>
-
-          {/* Supabase Setup Modal Form */}
-          {showSupabaseSettings && (
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs">
-              <p className="font-bold text-gray-800">Supabase API Keys konfigurieren:</p>
-              <input
-                type="text"
-                placeholder="https://your-project.supabase.co"
-                value={customSupabaseUrl}
-                onChange={(e) => setCustomSupabaseUrl(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded p-2 text-[11px]"
-              />
-              <input
-                type="password"
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-                value={customSupabaseKey}
-                onChange={(e) => setCustomSupabaseKey(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded p-2 text-[11px]"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveSupabase}
-                  className="bg-[#86b817] text-[#22262d] font-bold px-3 py-1 rounded text-[11px]"
-                >
-                  Speichern
-                </button>
-                <button
-                  type="button"
-                  onClick={clearSupabaseConfig}
-                  className="bg-gray-200 text-gray-700 font-bold px-3 py-1 rounded text-[11px]"
-                >
-                  Zurücksetzen
-                </button>
-              </div>
-            </div>
-          )}
 
         </form>
 
