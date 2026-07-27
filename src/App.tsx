@@ -25,8 +25,8 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Bookmarks State
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(['p-102']);
+  // Bookmarks State (empty for new visitors)
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
 
   // Active User State (null = ausgeloggt / Gast)
@@ -75,46 +75,8 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Mock Conversations List
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      id: 'conv-101',
-      listingId: 'p-101',
-      listingTitle: 'Tiefgaragen-Stellplatz nähe HBF Frankfurt',
-      listingImage: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=1000&q=80',
-      listingPrice: '12 € / Nacht',
-      landlordId: 'usr-landlord-1',
-      landlordName: 'Philip Schüßler',
-      renterId: 'me',
-      renterName: 'Mieter',
-      lastMessage: 'Hallo! Ist der Parkplatz heute von 22:00 bis 10:00 Uhr frei?',
-      lastMessageTime: '12:15',
-      unreadCount: 1,
-      createdAt: '2026-07-27',
-      expiresAt: 'In 14 Tagen',
-      canRate: true,
-      messages: [
-        {
-          id: 'm-1',
-          conversationId: 'conv-101',
-          senderId: 'usr-landlord-1',
-          senderName: 'Philip Schüßler',
-          text: 'Hallo! Ja, der Platz in der Tiefgarage Kaiserstraße ist heute ab 22:00 Uhr frei.',
-          timestamp: '12:10',
-          isRead: true,
-        },
-        {
-          id: 'm-2',
-          conversationId: 'conv-101',
-          senderId: 'me',
-          senderName: 'Ich',
-          text: 'Super! Kann ich vor Ort bar zahlen oder bevorzugst du PayPal?',
-          timestamp: '12:15',
-          isRead: true,
-        },
-      ],
-    },
-  ]);
+  // Conversations List (empty for new visitors)
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   // Toggle Bookmark
   const handleToggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -338,6 +300,16 @@ export default function App() {
     });
   }, [listings, filters, showBookmarksOnly, bookmarkedIds]);
 
+  // Rate Landlord Guard (Requires prior chat contact to prevent fake reviews)
+  const handleOpenRateLandlordGuard = (landlordId: string, landlordName: string) => {
+    const hasChatContact = conversations.some(c => c.landlordId === landlordId);
+    if (!hasChatContact) {
+      showToast('🔒 Bewertung erst nach persönlichem Chat-Kontakt & Miet-Absprache möglich!');
+      return;
+    }
+    setRateModalData({ isOpen: true, landlordId, landlordName });
+  };
+
   return (
     <div className="min-h-screen bg-[#f4f4f6] flex flex-col text-gray-900 font-sans antialiased">
       
@@ -467,7 +439,7 @@ export default function App() {
           onOpenChat={handleOpenChatForListing}
           onToggleBookmark={handleToggleBookmark}
           isBookmarked={bookmarkedIds.includes(selectedListing.id)}
-          onOpenRateLandlord={(lId, lName) => setRateModalData({ isOpen: true, landlordId: lId, landlordName: lName })}
+          onOpenRateLandlord={handleOpenRateLandlordGuard}
           onReportListing={handleReportListing}
         />
       )}
@@ -478,7 +450,7 @@ export default function App() {
           onClose={() => setActiveConversation(null)}
           onSendMessage={handleSendMessage}
           onDeleteConversation={handleDeleteConversation}
-          onOpenRateLandlord={(lId, lName) => setRateModalData({ isOpen: true, landlordId: lId, landlordName: lName })}
+          onOpenRateLandlord={handleOpenRateLandlordGuard}
         />
       )}
 
