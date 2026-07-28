@@ -80,7 +80,7 @@ export default function App() {
   // Conversations List
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
-  // Zurück zur Startseite Handler (wird über Logo & Header ausgelöst)
+  // Zurück zur Startseite Handler
   const handleGoHome = () => {
     setActivePage('home');
     setSelectedListing(null);
@@ -102,17 +102,19 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // GUARD: Inserieren nur wenn eingeloggt
+  // GUARD: Inserieren nur wenn eingeloggt und registriert
   const handleOpenCreateListingGuard = () => {
     if (!currentUser) {
-      showToast('🔒 Bitte melde dich zuerst an, um einen Parkplatz zu inserieren.');
+      showToast('🔒 Bitte registriere dich oder melde dich an, um ein Inserat zu erstellen.');
       setActivePage('auth');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     if (!currentUser.isEmailVerified) {
       showToast('⚠️ Bitte bestätige zuerst deine E-Mail-Adresse.');
       setActivePage('profil');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -132,7 +134,7 @@ export default function App() {
     }
   };
 
-  // Create New Listing (Mit echten hochgeladenen Bildern)
+  // Create New Listing
   const handleCreateListing = (newListingData: Partial<ParkingListing>) => {
     const created: ParkingListing = {
       id: `p-${Date.now()}`,
@@ -276,8 +278,22 @@ export default function App() {
     showToast('Anzeige gelöscht');
   };
 
+  // GUARD & GRUND-ABFRAGE BEIM MELDEN
   const handleReportListing = () => {
-    showToast('Anzeige & Profil gemeldet.');
+    if (!currentUser) {
+      showToast('🔒 Bitte melde dich an, um eine Anzeige zu melden.');
+      setActivePage('auth');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const reason = prompt('Bitte gib einen Grund für die Meldung an (z.B. Falsche Angaben, Betrugsverdacht):');
+    if (!reason || reason.trim() === '') {
+      showToast('Meldung abgebrochen: Es wurde kein Grund angegeben.');
+      return;
+    }
+
+    showToast(`Meldung erfolgreich eingereicht. Grund: "${reason}"`);
     handleGoHome();
   };
 
@@ -340,7 +356,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Header mit funktionierendem Logo-Klick zur Startseite */}
+      {/* Header mit Logo-Klick zur Startseite */}
       <Header
         filters={filters}
         setFilters={setFilters}
@@ -473,6 +489,7 @@ export default function App() {
           </>
         )}
 
+        {/* INSERAT ALS VOLLWERTIGE SEITE */}
         {activePage === 'detail' && selectedListing && (
           <div className="pb-8 max-w-4xl mx-auto">
             <button 
@@ -481,15 +498,17 @@ export default function App() {
             >
               <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
             </button>
-            <ListingDetailModal
-              listing={selectedListing}
-              onClose={handleGoHome}
-              onOpenChat={handleOpenChatForListing}
-              onToggleBookmark={handleToggleBookmark}
-              isBookmarked={bookmarkedIds.includes(selectedListing.id)}
-              onOpenRateLandlord={handleOpenRateLandlordGuard}
-              onReportListing={handleReportListing}
-            />
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+              <ListingDetailModal
+                listing={selectedListing}
+                onClose={handleGoHome}
+                onOpenChat={handleOpenChatForListing}
+                onToggleBookmark={handleToggleBookmark}
+                isBookmarked={bookmarkedIds.includes(selectedListing.id)}
+                onOpenRateLandlord={handleOpenRateLandlordGuard}
+                onReportListing={handleReportListing}
+              />
+            </div>
           </div>
         )}
 
@@ -527,7 +546,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Profil als vollwertige Hauptseite */}
         {activePage === 'profil' && (
           <div className="pb-12 max-w-7xl mx-auto w-full">
             <button 
