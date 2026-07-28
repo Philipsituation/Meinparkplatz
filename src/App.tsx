@@ -104,13 +104,22 @@ export default function App() {
     showToast(`Kategorie-Filter aktiv 🎯`);
   };
 
-  // GUARD: Inserieren nur wenn eingeloggt
+  // GUARD: Inserieren nur wenn eingeloggt UND E-Mail verifiziert
   const handleOpenCreateListingGuard = () => {
     if (!currentUser) {
       showToast('🔒 Bitte melde dich zuerst an, um einen Parkplatz zu inserieren.');
       setActivePage('auth');
+      setIsCreateListingModalOpen(false);
       return;
     }
+
+    if (!currentUser.isEmailVerified) {
+      showToast('⚠️ Bitte bestätige zuerst deine E-Mail-Adresse, um Inserate zu erstellen.');
+      setActivePage('profil');
+      setIsCreateListingModalOpen(false);
+      return;
+    }
+
     setIsCreateListingModalOpen(true);
   };
 
