@@ -1,254 +1,627 @@
-import React, { useState } from 'react';
-import { ParkingListing, VehicleType, PriceType, PaymentMethod } from '../types';
-import { X, Upload, Image as ImageIcon, Check } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Header } from './components/Header';
+import { SloganBanner } from './components/SloganBanner';
+import { FilterBar } from './components/FilterBar';
+import { ListingCard } from './components/ListingCard';
+import { MapView } from './components/MapView';
+import { ListingDetailModal } from './components/ListingDetailModal';
+import { ChatModal } from './components/ChatModal';
+import { SmileyRatingModal } from './components/SmileyRatingModal';
+import { CreateListingModal } from './components/CreateListingModal';
+import { AuthModal } from './components/AuthModal';
+import { ProfileModal } from './components/ProfileModal';
+import { LegalPagesModal } from './components/LegalPagesModal';
+import { CookieSettingsModal } from './components/CookieSettingsModal';
+import { Footer } from './components/Footer';
+import { AdBannerPlaceholder } from './components/AdBannerPlaceholder';
+import { initialListings } from './data/mockListings';
+import { ParkingListing, FilterState, Conversation, LegalModalType, SmileyRating } from './types';
+import { CheckCircle, Heart, ArrowLeft } from 'lucide-react';
 
-interface CreateListingModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmitListing: (listing: Partial<ParkingListing>) => void;
-}
-
-export const CreateListingModal: React.FC<CreateListingModalProps> = ({
-  isOpen,
-  onClose,
-  onSubmitListing,
-}) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState<'stellplatz' | 'garage' | 'carport' | 'hof' | 'tiefgarage'>('stellplatz');
-  const [price, setPrice] = useState<number>(10);
-  const [priceType, setPriceType] = useState<PriceType>('daily');
-  const [city, setCity] = useState('Frankfurt am Main');
-  const [zipCode, setZipCode] = useState('60329');
-  const [streetName, setStreetName] = useState('');
+export default function App() {
+  // Main Listings State
+  const [listings, setListings] = useState<ParkingListing[]>(initialListings);
   
-  // Bild-Zustand: Hält entweder Standard-URLs oder echte Datei-Vorschau-URLs
-  const [images, setImages] = useState<string[]>([
-    'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=1000&q=80',
-  ]);
+  // View Mode: List vs Map
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  const [suitableVehicles, setSuitableVehicles] = useState<VehicleType[]>(['pkw']);
-  const [features, setFeatures] = useState<string[]>(['überdacht']);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(['Bar', 'PayPal']);
+  // Active Page State
+  const [activePage, setActivePage] = useState<
+    'home' | 'profil' | 'auth' | 'createListing' | 'detail' | 'chat' | 'legal'
+  >('home');
 
-  if (!isOpen) return null;
+  // Bookmarks State
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
 
-  // Eigene Bilder vom PC hochladen
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).map(file => URL.createObjectURL(file));
-      setImages(prev => [...prev, ...newFiles]);
-    }
+  // Active User State
+  const [currentUser, setCurrentUser] = useState<{
+    name: string;
+    email: string;
+    isEmailVerified: boolean;
+    zipCode: string;
+  } | null>(null);
+
+  // Filter State
+  const [filters, setFilters] = useState<FilterState>({
+    searchQuery: '',
+    locationQuery: '',
+    radiusKm: 20,
+    selectedType: 'all',
+    selectedPriceType: 'all',
+    maxPrice: 200,
+    paymentMethod: 'all',
+    vehicleType: 'all',
+    features: [],
+    sortBy: 'newest',
+  });
+
+  // Selected Items for Full Pages
+  const [selectedListing, setSelectedListing] = useState<ParkingListing | null>(null);
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
+  const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
+
+  // Rate Landlord Modal State
+  const [rateModalData, setRateModalData] = useState<{ isOpen: boolean; landlordId: string; landlordName: string }>({
+    isOpen: false,
+    landlordId: '',
+    landlordName: '',
+  });
+
+  // Notification Toast State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleRemoveImage = (indexToRemove: number) => {
-    setImages(prev => prev.filter((_, index) => index !== indexToRemove));
+  // Conversations List
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+
+  // Zurück zur Startseite Handler (wird über Logo & Header ausgelöst)
+  const handleGoHome = () => {
+    setActivePage('home');
+    setSelectedListing(null);
+    setActiveConversation(null);
+    setShowBookmarksOnly(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !city.trim()) {
-      alert('Bitte fülle mindestens Titel und Stadt aus.');
+  // Exakte Kategorie Auswahl Handler
+  const handleSelectCategory = (categoryType: string) => {
+    setActivePage('home');
+    setShowBookmarksOnly(false);
+    setFilters(prev => ({
+      ...prev,
+      selectedType: categoryType,
+      searchQuery: '',
+      locationQuery: '',
+    }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // GUARD: Inserieren nur wenn eingeloggt
+  const handleOpenCreateListingGuard = () => {
+    if (!currentUser) {
+      showToast('🔒 Bitte melde dich zuerst an, um einen Parkplatz zu inserieren.');
+      setActivePage('auth');
       return;
     }
 
-    onSubmitListing({
-      title,
-      description,
-      type,
-      price: Number(price),
-      priceType,
-      city,
-      zipCode,
-      streetName,
-      images,
-      suitableVehicles,
-      features,
-      paymentMethods,
+    if (!currentUser.isEmailVerified) {
+      showToast('⚠️ Bitte bestätige zuerst deine E-Mail-Adresse.');
+      setActivePage('profil');
+      return;
+    }
+
+    setActivePage('createListing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Toggle Bookmark
+  const handleToggleBookmark = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (bookmarkedIds.includes(id)) {
+      setBookmarkedIds(prev => prev.filter(x => x !== id));
+      showToast('Von Merkzettel entfernt');
+    } else {
+      setBookmarkedIds(prev => [...prev, id]);
+      showToast('Auf Merkzettel gespeichert ❤️');
+    }
+  };
+
+  // Create New Listing (Mit echten hochgeladenen Bildern)
+  const handleCreateListing = (newListingData: Partial<ParkingListing>) => {
+    const created: ParkingListing = {
+      id: `p-${Date.now()}`,
+      title: newListingData.title || 'Neuer Parkplatz',
+      description: newListingData.description || '',
+      type: newListingData.type || 'stellplatz',
+      price: newListingData.price || 10,
+      priceType: newListingData.priceType || 'daily',
+      city: newListingData.city || 'Frankfurt am Main',
+      zipCode: newListingData.zipCode || '60329',
+      streetName: newListingData.streetName,
+      lat: newListingData.lat || 50.1109,
+      lng: newListingData.lng || 8.6821,
+      distanceKm: newListingData.distanceKm || 1.0,
+      availableTimesNote: newListingData.availableTimesNote || 'Flexibel',
+      suitableVehicles: newListingData.suitableVehicles || ['pkw'],
+      features: newListingData.features || ['überdacht'],
+      paymentMethods: newListingData.paymentMethods || ['Bar', 'PayPal'],
+      images: newListingData.images && newListingData.images.length > 0 
+        ? newListingData.images 
+        : ['https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=1000&q=80'],
+      landlord: {
+        id: 'usr-me',
+        name: currentUser?.name || 'Philip Schüßler',
+        email: currentUser?.email || 'philip.s@parkplatz.de',
+        isVerified: true,
+        memberSince: 'Juli 2026',
+        smileyRating: 'top',
+        topCount: 5,
+        zufriedenCount: 0,
+        najaCount: 0,
+        responseRate: '100%',
+        responseTime: '< 5 Min.',
+      },
+      createdAt: 'Gerade eben',
+      viewsCount: 1,
+      isFeatured: true,
+    };
+
+    setListings(prev => [created, ...prev]);
+    showToast('Anzeige erfolgreich veröffentlicht! 🎉');
+    handleGoHome();
+  };
+
+  // Open Chat for a Listing
+  const handleOpenChatForListing = (listing: ParkingListing) => {
+    let existing = conversations.find(c => c.listingId === listing.id);
+    if (!existing) {
+      existing = {
+        id: `conv-${Date.now()}`,
+        listingId: listing.id,
+        listingTitle: listing.title,
+        listingImage: listing.images[0],
+        listingPrice: `${listing.price} € (${listing.priceType})`,
+        landlordId: listing.landlord.id,
+        landlordName: listing.landlord.name,
+        renterId: 'me',
+        renterName: currentUser?.name || 'Mieter',
+        lastMessage: 'Hallo, ist der Parkplatz frei?',
+        lastMessageTime: 'Jetzt',
+        unreadCount: 0,
+        createdAt: '2026-07-27',
+        expiresAt: 'In 14 Tagen',
+        canRate: true,
+        messages: [
+          {
+            id: `m-${Date.now()}`,
+            conversationId: `conv-${Date.now()}`,
+            senderId: 'me',
+            senderName: 'Ich',
+            text: `Hallo ${listing.landlord.name}, ist der Parkplatz "${listing.title}" frei?`,
+            timestamp: 'Gerade eben',
+            isRead: true,
+          }
+        ],
+      };
+      setConversations(prev => [existing!, ...prev]);
+    }
+    setActiveConversation(existing);
+    setActivePage('chat');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSendMessage = (text: string) => {
+    if (!activeConversation) return;
+
+    const newMsg = {
+      id: `msg-${Date.now()}`,
+      conversationId: activeConversation.id,
+      senderId: 'me',
+      senderName: 'Ich',
+      text,
+      timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      isRead: true,
+    };
+
+    const updated = {
+      ...activeConversation,
+      lastMessage: text,
+      lastMessageTime: newMsg.timestamp,
+      messages: [...activeConversation.messages, newMsg],
+    };
+
+    setActiveConversation(updated);
+    setConversations(prev => prev.map(c => c.id === updated.id ? updated : c));
+
+    setTimeout(() => {
+      const landlordResponse = {
+        id: `msg-${Date.now() + 1}`,
+        conversationId: updated.id,
+        senderId: updated.landlordId,
+        senderName: updated.landlordName,
+        text: 'Vielen Dank für deine Anfrage! Der Parkplatz ist frei.',
+        timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        isRead: true,
+      };
+
+      const finalConv = {
+        ...updated,
+        lastMessage: landlordResponse.text,
+        lastMessageTime: landlordResponse.timestamp,
+        messages: [...updated.messages, landlordResponse],
+      };
+
+      setActiveConversation(prev => prev?.id === finalConv.id ? finalConv : prev);
+      setConversations(prev => prev.map(c => c.id === finalConv.id ? finalConv : c));
+    }, 1200);
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (activeConversation?.id === id) {
+      setActiveConversation(null);
+      setActivePage('home');
+    }
+    showToast('Chatverlauf gelöscht');
+  };
+
+  const handleDeleteListing = (id: string) => {
+    setListings(prev => prev.filter(l => l.id !== id));
+    showToast('Anzeige gelöscht');
+  };
+
+  const handleReportListing = () => {
+    showToast('Anzeige & Profil gemeldet.');
+    handleGoHome();
+  };
+
+  const handleSubmitRating = (rating: SmileyRating) => {
+    showToast(`Danke! Bewertet mit ${rating.toUpperCase()}`);
+  };
+
+  // Filter-Logik
+  const filteredListings = useMemo(() => {
+    return listings.filter(item => {
+      if (showBookmarksOnly && !bookmarkedIds.includes(item.id)) return false;
+      
+      if (filters.selectedType !== 'all' && item.type !== filters.selectedType) return false;
+
+      if (filters.searchQuery.trim()) {
+        const q = filters.searchQuery.toLowerCase();
+        const matchesTitle = item.title.toLowerCase().includes(q);
+        const matchesDesc = item.description.toLowerCase().includes(q);
+        const matchesCity = item.city.toLowerCase().includes(q);
+        const matchesZip = item.zipCode.includes(q);
+        if (!matchesTitle && !matchesDesc && !matchesCity && !matchesZip) return false;
+      }
+
+      if (filters.locationQuery.trim()) {
+        const loc = filters.locationQuery.toLowerCase();
+        const matchesCity = item.city.toLowerCase().includes(loc);
+        const matchesZip = item.zipCode.includes(loc);
+        if (!matchesCity && !matchesZip) return false;
+      }
+
+      if (filters.selectedPriceType !== 'all' && item.priceType !== filters.selectedPriceType) return false;
+      if (filters.paymentMethod !== 'all' && !item.paymentMethods.includes(filters.paymentMethod as any)) return false;
+      if (filters.vehicleType !== 'all' && !item.suitableVehicles.includes(filters.vehicleType as any)) return false;
+
+      return true;
+    }).sort((a, b) => {
+      if (filters.sortBy === 'price_asc') return a.price - b.price;
+      if (filters.sortBy === 'price_desc') return b.price - a.price;
+      if (filters.sortBy === 'distance') return (a.distanceKm || 0) - (b.distanceKm || 0);
+      return 0;
     });
+  }, [listings, filters, showBookmarksOnly, bookmarkedIds]);
+
+  const handleOpenRateLandlordGuard = (landlordId: string, landlordName: string) => {
+    const hasChatContact = conversations.some(c => c.landlordId === landlordId);
+    if (!hasChatContact) {
+      showToast('🔒 Bewertung erst nach Chat-Kontakt möglich!');
+      return;
+    }
+    setRateModalData({ isOpen: true, landlordId, landlordName });
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden max-w-2xl mx-auto my-6">
-      <div className="bg-[#22262d] text-white px-6 py-4 flex items-center justify-between">
-        <h2 className="font-extrabold text-base flex items-center gap-2">
-          <span>🅿️</span> Parkplatz inserieren
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#f4f4f6] flex flex-col text-gray-900 font-sans antialiased">
+      
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#22262d] text-white px-4 py-3 rounded-xl shadow-2xl border border-[#86b817] flex items-center gap-2 text-xs font-bold animate-bounce">
+          <CheckCircle className="w-4 h-4 text-[#86b817]" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-6 text-xs text-gray-800">
+      {/* Header mit funktionierendem Logo-Klick zur Startseite */}
+      <Header
+        filters={filters}
+        setFilters={setFilters}
+        onLogoClick={handleGoHome}
+        onOpenCreateListing={handleOpenCreateListingGuard}
+        onOpenAuth={() => { setActivePage('auth'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        onOpenProfile={() => { setActivePage('profil'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        onLogout={() => {
+          setCurrentUser(null);
+          showToast('Erfolgreich abgemeldet 👋');
+          handleGoHome();
+        }}
+        onOpenChat={() => {
+          if (conversations.length > 0) {
+            setActiveConversation(conversations[0]);
+            setActivePage('chat');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            showToast('Keine aktiven Nachrichten vorhanden');
+          }
+        }}
+        onOpenBookmarks={() => {
+          setActivePage('home');
+          setShowBookmarksOnly(!showBookmarksOnly);
+        }}
+        unreadChatsCount={conversations.reduce((sum, c) => sum + c.unreadCount, 0)}
+        bookmarkedCount={bookmarkedIds.length}
+        currentUser={currentUser}
+        onSearchSubmit={() => setActivePage('home')}
+      />
+
+      {activePage === 'home' && (
+        <>
+          <SloganBanner 
+            onOpenCreateListing={handleOpenCreateListingGuard} 
+            onSelectCategory={handleSelectCategory}
+          />
+          <FilterBar
+            filters={filters}
+            setFilters={setFilters}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            totalResults={filteredListings.length}
+          />
+        </>
+      )}
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
-        {/* Titel & Typ */}
-        <div className="space-y-4">
-          <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">1. Grunddetails</h3>
-          
-          <div>
-            <label className="block font-bold mb-1 text-gray-700">Titel des Inserats *</label>
-            <input
-              type="text"
-              required
-              placeholder="z.B. Sicherer Tiefgaragenstellplatz im Bahnhofsviertel"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Parkplatz-Art</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as any)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
-              >
-                <option value="stellplatz">Freier Stellplatz</option>
-                <option value="garage">Garage</option>
-                <option value="carport">Carport</option>
-                <option value="hof">Hof / Einfahrt</option>
-                <option value="tiefgarage">Tiefgarage</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Beschreibung</label>
-              <textarea
-                rows={2}
-                placeholder="Details zur Zufahrt, Höhe, Besonderheiten..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#86b817]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Standort */}
-        <div className="space-y-4">
-          <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">2. Standort</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Stadt *</label>
-              <input
-                type="text"
-                required
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">PLZ *</label>
-              <input
-                type="text"
-                required
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Straße & Hausnummer</label>
-              <input
-                type="text"
-                placeholder="Musterstraße 12"
-                value={streetName}
-                onChange={(e) => setStreetName(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Eigene Bilder hochladen */}
-        <div className="space-y-4">
-          <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">3. Fotos hochladen</h3>
-          <p className="text-[11px] text-gray-500">Lade echte Bilder deines Parkplatzes hoch, damit Mieter ihn sofort erkennen.</p>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {images.map((imgUrl, index) => (
-              <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                <img src={imgUrl} alt={`Upload ${index}`} className="w-full h-full object-cover" />
+        {activePage === 'home' && (
+          <>
+            {showBookmarksOnly && (
+              <div className="mb-4 bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-center justify-between text-xs text-rose-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Heart className="w-4 h-4 text-rose-500 fill-current" />
+                  Merkzettel ({filteredListings.length} gespeicherte Parkplätze)
+                </span>
                 <button
-                  type="button"
-                  onClick={() => handleRemoveImage(index)}
-                  className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-80 group-hover:opacity-100 transition-opacity shadow"
-                  title="Bild löschen"
+                  onClick={() => setShowBookmarksOnly(false)}
+                  className="bg-white border border-rose-300 px-3 py-1 rounded-lg text-[11px] text-gray-800 hover:bg-rose-100"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  Alle Anzeigen
                 </button>
               </div>
-            ))}
+            )}
 
-            {/* Upload-Button Feld */}
-            <label className="border-2 border-dashed border-gray-300 hover:border-[#86b817] rounded-xl flex flex-col items-center justify-center p-4 cursor-pointer bg-gray-50 hover:bg-[#86b817]/5 transition-colors aspect-square text-center">
-              <Upload className="w-6 h-6 text-gray-400 mb-1" />
-              <span className="font-bold text-[11px] text-gray-700">Foto wählen</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-                className="hidden"
+            {filters.selectedType !== 'all' && (
+              <div className="mb-4 bg-[#86b817]/10 border border-[#86b817]/30 p-3 rounded-xl flex items-center justify-between text-xs text-gray-800 font-bold">
+                <span className="flex items-center gap-2">
+                  <span>Aktive Kategorie:</span>
+                  <span className="bg-[#86b817] text-[#22262d] px-2.5 py-0.5 rounded-md uppercase tracking-wider text-[11px]">
+                    {filters.selectedType}
+                  </span>
+                </span>
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, selectedType: 'all' }))}
+                  className="bg-white border border-gray-300 px-3 py-1 rounded-lg text-[11px] hover:bg-gray-100 shadow-sm transition-colors"
+                >
+                  Kategorie aufheben ✕
+                </button>
+              </div>
+            )}
+
+            {viewMode === 'list' ? (
+              <div>
+                {filteredListings.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 space-y-4 my-8 max-w-md mx-auto shadow-sm">
+                    <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+                      🔍
+                    </div>
+                    <h3 className="font-extrabold text-gray-900 text-base">Keine Parkplätze gefunden</h3>
+                    <button
+                      onClick={() => setFilters(prev => ({ ...prev, selectedType: 'all', searchQuery: '' }))}
+                      className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-5 py-2.5 rounded-xl text-xs shadow"
+                    >
+                      Filter zurücksetzen
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredListings.map((listing) => (
+                      <ListingCard
+                        key={listing.id}
+                        listing={listing}
+                        onSelect={(l) => {
+                          setSelectedListing(l);
+                          setActivePage('detail');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        onToggleBookmark={handleToggleBookmark}
+                        isBookmarked={bookmarkedIds.includes(listing.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <MapView
+                listings={filteredListings}
+                onSelectListing={(l) => {
+                  setSelectedListing(l);
+                  setActivePage('detail');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                radiusKm={filters.radiusKm}
               />
-            </label>
+            )}
+
+            <AdBannerPlaceholder />
+          </>
+        )}
+
+        {activePage === 'detail' && selectedListing && (
+          <div className="pb-8 max-w-4xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
+            </button>
+            <ListingDetailModal
+              listing={selectedListing}
+              onClose={handleGoHome}
+              onOpenChat={handleOpenChatForListing}
+              onToggleBookmark={handleToggleBookmark}
+              isBookmarked={bookmarkedIds.includes(selectedListing.id)}
+              onOpenRateLandlord={handleOpenRateLandlordGuard}
+              onReportListing={handleReportListing}
+            />
           </div>
-        </div>
+        )}
 
-        {/* Preis */}
-        <div className="space-y-4">
-          <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">4. Preisgestaltung</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Betrag in EUR (€)</label>
-              <input
-                type="number"
-                min="1"
-                required
-                value={price}
-                onChange={(e) => setPrice(Number(e.target.value))}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block font-bold mb-1 text-gray-700">Abrechnungsart</label>
-              <select
-                value={priceType}
-                onChange={(e) => setPriceType(e.target.value as PriceType)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs"
-              >
-                <option value="hourly">Pro Stunde</option>
-                <option value="daily">Pro Tag</option>
-                <option value="monthly">Pro Monat</option>
-              </select>
-            </div>
+        {activePage === 'chat' && activeConversation && (
+          <div className="pb-8 max-w-4xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+            <ChatModal
+              conversation={activeConversation}
+              onClose={handleGoHome}
+              onSendMessage={handleSendMessage}
+              onDeleteConversation={handleDeleteConversation}
+              onOpenRateLandlord={handleOpenRateLandlordGuard}
+            />
           </div>
-        </div>
+        )}
 
-        {/* Buttons */}
-        <div className="pt-4 border-t flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-gray-300 font-bold text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            Abbrechen
-          </button>
-          <button
-            type="submit"
-            className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-6 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5"
-          >
-            <Check className="w-4 h-4" /> Inserat veröffentlichen
-          </button>
-        </div>
+        {activePage === 'createListing' && (
+          <div className="pb-8 max-w-3xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Abbrechen & Zurück
+            </button>
+            <CreateListingModal
+              isOpen={true}
+              onClose={handleGoHome}
+              onSubmitListing={handleCreateListing}
+            />
+          </div>
+        )}
 
-      </form>
+        {/* Profil als vollwertige Hauptseite */}
+        {activePage === 'profil' && (
+          <div className="pb-12 max-w-7xl mx-auto w-full">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+            
+            <ProfileModal
+              isOpen={true} 
+              onClose={handleGoHome} 
+              currentUser={currentUser || { name: 'Philip Schüßler', email: 'philip.s@parkplatz.de', isEmailVerified: true, zipCode: '60329' }}
+              userListings={listings.filter(l => l.landlord.id === 'usr-landlord-1' || l.landlord.id === 'usr-me')}
+              conversations={conversations}
+              bookmarkedListings={listings.filter(l => bookmarkedIds.includes(l.id))}
+              onDeleteListing={handleDeleteListing}
+              onOpenChatWithConversation={(conv) => {
+                setActiveConversation(conv);
+                setActivePage('chat');
+              }}
+              onLogout={() => {
+                setCurrentUser(null);
+                handleGoHome();
+                showToast('Erfolgreich abgemeldet');
+              }}
+              onDeleteAccount={() => {
+                setCurrentUser(null);
+                handleGoHome();
+                showToast('Konto und Daten wurden gelöscht');
+              }}
+            />
+          </div>
+        )}
+
+        {activePage === 'auth' && (
+          <div className="pb-8 max-w-md mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+
+            <AuthModal
+              isOpen={true}
+              onClose={handleGoHome}
+              onLoginSuccess={(user) => {
+                setCurrentUser(user);
+                setActivePage('home');
+                showToast(`Willkommen, ${user.name}!`);
+              }}
+            />
+          </div>
+        )}
+
+        {activePage === 'legal' && (
+          <div className="pb-8 max-w-3xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+            <LegalPagesModal
+              type={activeLegalModal}
+              onClose={handleGoHome}
+            />
+          </div>
+        )}
+      </main>
+
+      <Footer
+        onOpenLegalModal={(type) => {
+          setActiveLegalModal(type);
+          setActivePage('legal');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenCookieSettings={() => setIsCookieModalOpen(true)}
+        onOpenCreateListing={handleOpenCreateListingGuard}
+      />
+
+      <SmileyRatingModal
+        isOpen={rateModalData.isOpen}
+        landlordName={rateModalData.landlordName}
+        onClose={() => setRateModalData({ isOpen: false, landlordId: '', landlordName: '' })}
+        onSubmitRating={handleSubmitRating}
+      />
+
+      <CookieSettingsModal
+        isOpen={isCookieModalOpen}
+        onClose={() => setIsCookieModalOpen(false)}
+      />
+
     </div>
   );
-};
+}
