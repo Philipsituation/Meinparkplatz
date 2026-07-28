@@ -4,7 +4,6 @@ import { SloganBanner } from './components/SloganBanner';
 import { FilterBar } from './components/FilterBar';
 import { ListingCard } from './components/ListingCard';
 import { MapView } from './components/MapView';
-import { ListingDetailModal } from './components/ListingDetailModal';
 import { ChatModal } from './components/ChatModal';
 import { SmileyRatingModal } from './components/SmileyRatingModal';
 import { CreateListingModal } from './components/CreateListingModal';
@@ -16,7 +15,7 @@ import { Footer } from './components/Footer';
 import { AdBannerPlaceholder } from './components/AdBannerPlaceholder';
 import { initialListings } from './data/mockListings';
 import { ParkingListing, FilterState, Conversation, LegalModalType, SmileyRating } from './types';
-import { CheckCircle, Heart, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Heart, ArrowLeft, MessageSquare, ShieldCheck, Check } from 'lucide-react';
 
 export default function App() {
   // Main Listings State
@@ -25,7 +24,7 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Active Page State (Jetzt steuert das absolut sauber die Hauptansicht!)
+  // Active Page State
   const [activePage, setActivePage] = useState<
     'home' | 'profil' | 'auth' | 'createListing' | 'detail' | 'chat' | 'legal'
   >('home');
@@ -61,6 +60,9 @@ export default function App() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
+
+  // Detailseite Bilder-Vorschau State
+  const [detailActiveImageIndex, setDetailActiveImageIndex] = useState(0);
 
   // Rate Landlord Modal State
   const [rateModalData, setRateModalData] = useState<{ isOpen: boolean; landlordId: string; landlordName: string }>({
@@ -407,7 +409,7 @@ export default function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
-        {/* ================= HIER IST DIE HAUPTSEITEN-STEUERUNG ================= */}
+        {/* ================= HAUPTSEITEN-STEUERUNG ================= */}
 
         {/* 1. STARTSEITE (LISTE / MAP) */}
         {activePage === 'home' && (
@@ -467,7 +469,8 @@ export default function App() {
                         listing={listing}
                         onSelect={(l) => {
                           setSelectedListing(l);
-                          setActivePage('detail'); // Schaltet sauber auf die Inserats-Seite um!
+                          setDetailActiveImageIndex(0);
+                          setActivePage('detail');
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         onToggleBookmark={handleToggleBookmark}
@@ -482,7 +485,8 @@ export default function App() {
                 listings={filteredListings}
                 onSelectListing={(l) => {
                   setSelectedListing(l);
-                  setActivePage('detail'); // Schaltet sauber auf die Inserats-Seite um!
+                  setDetailActiveImageIndex(0);
+                  setActivePage('detail');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 radiusKm={filters.radiusKm}
@@ -493,25 +497,122 @@ export default function App() {
           </>
         )}
 
-        {/* 2. INSERAT DETAILSEITE */}
+        {/* 2. INSERAT DETAILSEITE (VOLLSTÄNDIGE EIGENE SEITE) */}
         {activePage === 'detail' && selectedListing && (
-          <div className="pb-8 max-w-4xl mx-auto">
+          <div className="pb-12 max-w-4xl mx-auto w-full space-y-6">
             <button 
               onClick={handleGoHome}
-              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+              className="bg-white border border-gray-300 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
             </button>
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-              <ListingDetailModal
-                listing={selectedListing}
-                onClose={handleGoHome}
-                onOpenChat={handleOpenChatForListing}
-                onToggleBookmark={handleToggleBookmark}
-                isBookmarked={bookmarkedIds.includes(selectedListing.id)}
-                onOpenRateLandlord={handleOpenRateLandlordGuard}
-                onReportListing={handleReportListing}
-              />
+
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6">
+              
+              {/* Kopfzeile */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
+                <div>
+                  <span className="bg-[#86b817]/20 text-[#22262d] font-black text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {selectedListing.priceType === 'hourly' ? 'Stundenparkplatz' : selectedListing.priceType === 'daily' ? 'Tagesparkplatz' : 'Monatsparkplatz'}
+                  </span>
+                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 mt-2">{selectedListing.title}</h1>
+                  <p className="text-gray-500 text-xs flex items-center gap-1 mt-1">
+                    📍 {selectedListing.city} ({selectedListing.zipCode}) {selectedListing.streetName ? `• ${selectedListing.streetName}` : ''}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-black text-gray-900">
+                    {selectedListing.price} €
+                  </div>
+                  <div className="text-xs text-gray-500 font-bold">
+                    pro {selectedListing.priceType === 'hourly' ? 'Stunde' : selectedListing.priceType === 'daily' ? 'Tag' : 'Monat'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bildergalerie (Hauptbild + kleine Vorschaubilder zum Durchklicken) */}
+              <div className="space-y-3">
+                <div className="w-full h-72 sm:h-96 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
+                  <img 
+                    src={selectedListing.images[detailActiveImageIndex] || selectedListing.images[0]} 
+                    alt={selectedListing.title} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {selectedListing.images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {selectedListing.images.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setDetailActiveImageIndex(idx)}
+                        className={`w-20 h-20 rounded-xl overflow-hidden border-2 flex-shrink-0 transition-all ${detailActiveImageIndex === idx ? 'border-[#86b817] shadow' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                      >
+                        <img src={img} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Beschreibung & Details */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                <div className="md:col-span-2 space-y-6">
+                  <div className="space-y-3">
+                    <h3 className="font-extrabold text-sm text-gray-900 border-b pb-2">Beschreibung</h3>
+                    <p className="text-xs sm:text-sm text-gray-700 leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      {selectedListing.description}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="font-extrabold text-sm text-gray-900 border-b pb-2">Ausstattung & Merkmale</h3>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
+                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> Beleuchteter Stellplatz</li>
+                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> 24/7 Zugang möglich</li>
+                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> Sicherer Bereich</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Aktions-Box auf der rechten Seite */}
+                <div className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200 h-fit">
+                  <div className="flex items-center gap-3 pb-3 border-b">
+                    <div className="w-10 h-10 bg-[#22262d] text-white font-extrabold rounded-full flex items-center justify-center text-xs">
+                      {selectedListing.landlord.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-gray-900 flex items-center gap-1">
+                        {selectedListing.landlord.name} <ShieldCheck className="w-3.5 h-3.5 text-[#86b817]" />
+                      </h4>
+                      <p className="text-[10px] text-gray-500">Antwortet meist schnell</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleOpenChatForListing(selectedListing)}
+                    className="w-full bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-black py-3 px-4 rounded-xl shadow text-xs transition-colors flex items-center justify-center gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Nachricht an Vermieter
+                  </button>
+
+                  <button
+                    onClick={(e) => handleToggleBookmark(selectedListing.id, e)}
+                    className="w-full bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Heart className={`w-4 h-4 text-rose-500 ${bookmarkedIds.includes(selectedListing.id) ? 'fill-current' : ''}`} />
+                    {bookmarkedIds.includes(selectedListing.id) ? 'Von Merkzettel entfernen' : 'Auf Merkzettel'}
+                  </button>
+
+                  <button
+                    onClick={handleReportListing}
+                    className="w-full text-rose-600 hover:text-rose-700 text-[11px] font-bold py-1 text-center"
+                  >
+                    Anzeige melden
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -584,11 +685,12 @@ export default function App() {
                 handleGoHome();
                 showToast('Konto und Daten wurden gelöscht');
               }}
+              onGoHome={handleGoHome}
             />
           </div>
         )}
 
-        {/* 6. AUTHENTIFIZIERUNG (ANMELDEN / REGISTRIEREN) */}
+        {/* 6. AUTHENTIFIZIERUNG */}
         {activePage === 'auth' && (
           <div className="pb-8 max-w-md mx-auto">
             <button 
