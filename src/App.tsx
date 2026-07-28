@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { SloganBanner } from './components/SloganBanner';
 import { FilterBar } from './components/FilterBar';
@@ -25,7 +25,7 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Active Page State
+  // Active Page State (Jetzt steuert das absolut sauber die Hauptansicht!)
   const [activePage, setActivePage] = useState<
     'home' | 'profil' | 'auth' | 'createListing' | 'detail' | 'chat' | 'legal'
   >('home');
@@ -388,6 +388,7 @@ export default function App() {
         onSearchSubmit={() => setActivePage('home')}
       />
 
+      {/* Slogan & Filter nur auf der Startseite anzeigen */}
       {activePage === 'home' && (
         <>
           <SloganBanner 
@@ -406,6 +407,9 @@ export default function App() {
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
+        {/* ================= HIER IST DIE HAUPTSEITEN-STEUERUNG ================= */}
+
+        {/* 1. STARTSEITE (LISTE / MAP) */}
         {activePage === 'home' && (
           <>
             {showBookmarksOnly && (
@@ -463,7 +467,7 @@ export default function App() {
                         listing={listing}
                         onSelect={(l) => {
                           setSelectedListing(l);
-                          setActivePage('detail');
+                          setActivePage('detail'); // Schaltet sauber auf die Inserats-Seite um!
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         onToggleBookmark={handleToggleBookmark}
@@ -478,7 +482,7 @@ export default function App() {
                 listings={filteredListings}
                 onSelectListing={(l) => {
                   setSelectedListing(l);
-                  setActivePage('detail');
+                  setActivePage('detail'); // Schaltet sauber auf die Inserats-Seite um!
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 radiusKm={filters.radiusKm}
@@ -489,7 +493,7 @@ export default function App() {
           </>
         )}
 
-        {/* INSERAT ALS VOLLWERTIGE SEITE */}
+        {/* 2. INSERAT DETAILSEITE */}
         {activePage === 'detail' && selectedListing && (
           <div className="pb-8 max-w-4xl mx-auto">
             <button 
@@ -512,6 +516,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 3. CHAT SEITE */}
         {activePage === 'chat' && activeConversation && (
           <div className="pb-8 max-w-4xl mx-auto">
             <button 
@@ -530,6 +535,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 4. INSERIEREN SEITE */}
         {activePage === 'createListing' && (
           <div className="pb-8 max-w-3xl mx-auto">
             <button 
@@ -546,6 +552,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 5. PROFIL SEITE */}
         {activePage === 'profil' && (
           <div className="pb-12 max-w-7xl mx-auto w-full">
             <button 
@@ -581,6 +588,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 6. AUTHENTIFIZIERUNG (ANMELDEN / REGISTRIEREN) */}
         {activePage === 'auth' && (
           <div className="pb-8 max-w-md mx-auto">
             <button 
@@ -602,6 +610,7 @@ export default function App() {
           </div>
         )}
 
+        {/* 7. RECHTLICHES SEITEN */}
         {activePage === 'legal' && (
           <div className="pb-8 max-w-3xl mx-auto">
             <button 
