@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { SloganBanner } from './components/SloganBanner';
 import { FilterBar } from './components/FilterBar';
@@ -18,22 +18,16 @@ import { ParkingListing, FilterState, Conversation, LegalModalType, SmileyRating
 import { CheckCircle, Heart, ArrowLeft, MessageSquare, ShieldCheck, Check } from 'lucide-react';
 
 export default function App() {
-  // Main Listings State
   const [listings, setListings] = useState<ParkingListing[]>(initialListings);
-  
-  // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Active Page State
   const [activePage, setActivePage] = useState<
     'home' | 'profil' | 'auth' | 'createListing' | 'detail' | 'chat' | 'legal'
   >('home');
 
-  // Bookmarks State
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
 
-  // Active User State
   const [currentUser, setCurrentUser] = useState<{
     name: string;
     email: string;
@@ -41,7 +35,6 @@ export default function App() {
     zipCode: string;
   } | null>(null);
 
-  // Filter State
   const [filters, setFilters] = useState<FilterState>({
     searchQuery: '',
     locationQuery: '',
@@ -55,23 +48,18 @@ export default function App() {
     sortBy: 'newest',
   });
 
-  // Selected Items for Full Pages
   const [selectedListing, setSelectedListing] = useState<ParkingListing | null>(null);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
-
-  // Detailseite Bilder-Vorschau State
   const [detailActiveImageIndex, setDetailActiveImageIndex] = useState(0);
 
-  // Rate Landlord Modal State
   const [rateModalData, setRateModalData] = useState<{ isOpen: boolean; landlordId: string; landlordName: string }>({
     isOpen: false,
     landlordId: '',
     landlordName: '',
   });
 
-  // Notification Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -79,10 +67,8 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Conversations List
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
-  // Zurück zur Startseite Handler
   const handleGoHome = () => {
     setActivePage('home');
     setSelectedListing(null);
@@ -91,7 +77,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Exakte Kategorie Auswahl Handler
   const handleSelectCategory = (categoryType: string) => {
     setActivePage('home');
     setShowBookmarksOnly(false);
@@ -104,7 +89,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // GUARD: Inserieren nur wenn eingeloggt und registriert
   const handleOpenCreateListingGuard = () => {
     if (!currentUser) {
       showToast('🔒 Bitte registriere dich oder melde dich an, um ein Inserat zu erstellen.');
@@ -124,7 +108,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Toggle Bookmark
   const handleToggleBookmark = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (bookmarkedIds.includes(id)) {
@@ -136,7 +119,6 @@ export default function App() {
     }
   };
 
-  // Create New Listing
   const handleCreateListing = (newListingData: Partial<ParkingListing>) => {
     const created: ParkingListing = {
       id: `p-${Date.now()}`,
@@ -181,7 +163,6 @@ export default function App() {
     handleGoHome();
   };
 
-  // Open Chat for a Listing
   const handleOpenChatForListing = (listing: ParkingListing) => {
     let existing = conversations.find(c => c.listingId === listing.id);
     if (!existing) {
@@ -280,7 +261,6 @@ export default function App() {
     showToast('Anzeige gelöscht');
   };
 
-  // GUARD & GRUND-ABFRAGE BEIM MELDEN
   const handleReportListing = () => {
     if (!currentUser) {
       showToast('🔒 Bitte melde dich an, um eine Anzeige zu melden.');
@@ -303,11 +283,9 @@ export default function App() {
     showToast(`Danke! Bewertet mit ${rating.toUpperCase()}`);
   };
 
-  // Filter-Logik
   const filteredListings = useMemo(() => {
     return listings.filter(item => {
       if (showBookmarksOnly && !bookmarkedIds.includes(item.id)) return false;
-      
       if (filters.selectedType !== 'all' && item.type !== filters.selectedType) return false;
 
       if (filters.searchQuery.trim()) {
@@ -358,7 +336,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Header mit Logo-Klick zur Startseite */}
       <Header
         filters={filters}
         setFilters={setFilters}
@@ -390,7 +367,6 @@ export default function App() {
         onSearchSubmit={() => setActivePage('home')}
       />
 
-      {/* Slogan & Filter nur auf der Startseite anzeigen */}
       {activePage === 'home' && (
         <>
           <SloganBanner 
@@ -408,10 +384,6 @@ export default function App() {
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        
-        {/* ================= HAUPTSEITEN-STEUERUNG ================= */}
-
-        {/* 1. STARTSEITE (LISTE / MAP) */}
         {activePage === 'home' && (
           <>
             {showBookmarksOnly && (
@@ -497,7 +469,6 @@ export default function App() {
           </>
         )}
 
-        {/* 2. INSERAT DETAILSEITE (VOLLSTÄNDIGE EIGENE SEITE) */}
         {activePage === 'detail' && selectedListing && (
           <div className="pb-12 max-w-4xl mx-auto w-full space-y-6">
             <button 
@@ -509,7 +480,6 @@ export default function App() {
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6">
               
-              {/* Kopfzeile */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-4">
                 <div>
                   <span className="bg-[#86b817]/20 text-[#22262d] font-black text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -531,7 +501,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Bildergalerie (Hauptbild + kleine Vorschaubilder zum Durchklicken) */}
               <div className="space-y-3">
                 <div className="w-full h-72 sm:h-96 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
                   <img 
@@ -555,7 +524,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Beschreibung & Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
                 <div className="md:col-span-2 space-y-6">
                   <div className="space-y-3">
@@ -566,16 +534,13 @@ export default function App() {
                   </div>
 
                   <div className="space-y-3">
-                    <h3 className="font-extrabold text-sm text-gray-900 border-b pb-2">Ausstattung & Merkmale</h3>
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
-                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> Beleuchteter Stellplatz</li>
-                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> 24/7 Zugang möglich</li>
-                      <li className="flex items-center gap-2"><Check className="w-4 h-4 text-[#86b817]" /> Sicherer Bereich</li>
-                    </ul>
+                    <h3 className="font-extrabold text-sm text-gray-900 border-b pb-2">Rechtlicher Hinweis zum Vertrag</h3>
+                    <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                      Mietverträge (z.B. für Kurzzeit-Parken über wenige Stunden) kommen <strong>ausschließlich privat direkt zwischen Vermieter und Mieter</strong> zustande (mündlich, per Handschlag oder Chat). Dieses Portal stellt lediglich die Kommunikations-Infrastruktur bereit und übernimmt keine Haftung für Nichtzahlung, Betrug oder Schäden.
+                    </p>
                   </div>
                 </div>
 
-                {/* Aktions-Box auf der rechten Seite */}
                 <div className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200 h-fit">
                   <div className="flex items-center gap-3 pb-3 border-b">
                     <div className="w-10 h-10 bg-[#22262d] text-white font-extrabold rounded-full flex items-center justify-center text-xs">
@@ -617,7 +582,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. CHAT SEITE */}
         {activePage === 'chat' && activeConversation && (
           <div className="pb-8 max-w-4xl mx-auto">
             <button 
@@ -636,7 +600,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. INSERIEREN SEITE */}
         {activePage === 'createListing' && (
           <div className="pb-8 max-w-3xl mx-auto">
             <button 
@@ -653,7 +616,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. PROFIL SEITE */}
         {activePage === 'profil' && (
           <div className="pb-12 max-w-7xl mx-auto w-full">
             <button 
@@ -690,7 +652,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 6. AUTHENTIFIZIERUNG */}
         {activePage === 'auth' && (
           <div className="pb-8 max-w-md mx-auto">
             <button 
@@ -712,7 +673,6 @@ export default function App() {
           </div>
         )}
 
-        {/* 7. RECHTLICHES SEITEN */}
         {activePage === 'legal' && (
           <div className="pb-8 max-w-3xl mx-auto">
             <button 
