@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ParkingListing, Conversation } from '../types';
-import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin, Upload } from 'lucide-react';
+import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin, Upload, ArrowLeft, ArrowRight, Home } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ interface ProfileModalProps {
   onOpenChatWithConversation: (conv: Conversation) => void;
   onLogout: () => void;
   onDeleteAccount: () => void;
+  onGoHome?: () => void; // Neu: Funktion um zum Startbildschirm zurückzukehren
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -29,6 +30,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onOpenChatWithConversation,
   onLogout,
   onDeleteAccount,
+  onGoHome,
 }) => {
   if (!isOpen) return null;
 
@@ -74,27 +76,70 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setEditingListing(null);
   };
 
-  // Funktion zum Hochladen von echten Bilddateien vom Handy/PC
+  // Echter Bild-Upload vom Handy/PC mittels Base64
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files.length || !editingListing) return;
     
     const files = Array.from(e.target.files);
-    const newImageUrls = files.map(file => URL.createObjectURL(file));
 
-    setEditingListing({
-      ...editingListing,
-      images: [...editingListing.images, ...newImageUrls]
-    });
+    Promise.all(
+      files.map((file) => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              resolve(event.target.result as string);
+            }
+          };
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      })
+    ).then((base64Images) => {
+      setEditingListing((prev) => 
+        prev ? { ...prev, images: [...prev.images, ...base64Images] } : null
+      );
+    }).catch((err) => console.error("Fehler beim Bild-Upload:", err));
+  };
+
+  // Hilfsfunktionen zum Verschieben der Bilder (Reihenfolge / Titelbild)
+  const handleMoveImage = (index: number, direction: 'left' | 'right') => {
+    if (!editingListing) return;
+    const newImages = [...editingListing.images];
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newImages.length) return;
+
+    // Tauschen
+    const temp = newImages[index];
+    newImages[index] = newImages[targetIndex];
+    newImages[targetIndex] = temp;
+
+    setEditingListing({ ...editingListing, images: newImages });
+  };
+
+  const handleSetAsCover = (index: number) => {
+    if (!editingListing || index === 0) return;
+    const newImages = [...editingListing.images];
+    const [selectedImage] = newImages.splice(index, 1);
+    newImages.unshift(selectedImage); // An den Anfang setzen (wird Titelbild)
+
+    setEditingListing({ ...editingListing, images: newImages });
   };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden text-xs text-gray-800">
       
-      {/* Kopfbereich der Profilseite */}
+      {/* Kopfbereich der Profilseite mit klickbarem Logo / Start-Button */}
       <div className="bg-[#22262d] text-white px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#86b817] text-[#22262d] font-black rounded-2xl flex items-center justify-center text-lg shadow">
-            {currentUser.name.charAt(0).toUpperCase()}
+          {/* Logo / Avatar klickbar, führt zum Startbildschirm */}
+          <div 
+            onClick={onGoHome}
+            className={`w-12 h-12 bg-[#86b817] text-[#22262d] font-black rounded-2xl flex items-center justify-center text-lg shadow ${onGoHome ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+            title="Zum Startbildschirm"
+          >
+            {onGoHome ? <Home className="w-6 h-6" /> : currentUser.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <h2 className="font-extrabold text-sm sm:text-base flex items-center gap-2">
@@ -109,12 +154,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onLogout}
-          className="bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-colors flex items-center gap-1.5"
-        >
-          <LogOut className="w-4 h-4" /> Abmelden
-        </button>
+        <div className="flex items-center gap-2">
+          {onGoHome && (
+            <button
+              onClick={onGoHome}
+              className="hidden sm:flex bg-[#86b817] text-[#22262d] hover:bg-[#74a312] font-extrabold px-3.5 py-2 rounded-xl transition-colors items-center gap-1.5"
+            >
+              <Home className="w-4 h-4" /> Startseite
+            </button>
+          )}
+          <button
+            onClick={onLogout}
+            className="bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-colors flex items-center gap-1.5"
+          >
+            <LogOut className="w-4 h-4" /> Abmelden
+          </button>
+        </div>
       </div>
 
       {successMessage && (
@@ -183,7 +238,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         {activeTab === 'listings' && (
           <div className="space-y-4">
             {editingListing ? (
-              // BEARBEITUNGS-FORMULAR
+              // BEARBEITUNGS-FORMULAR (SEITE ZUM BEARBEITEN)
               <form onSubmit={handleSaveEdit} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
                 <div className="flex items-center justify-between border-b pb-2">
                   <h3 className="font-extrabold text-gray-900 text-sm flex items-center gap-1.5">
@@ -247,27 +302,83 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   />
                 </div>
 
-                {/* Echte Bilder vom Handy/PC hochladen */}
+                {/* Bilder verwalten, Reihenfolge ändern & Titelbild festlegen */}
                 <div className="space-y-3">
-                  <label className="block font-bold text-gray-700 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#86b817]" /> Fotos verwalten (vom Gerät hochladen)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-gray-700 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-[#86b817]" /> Fotos verwalten & Reihenfolge (Erstes Bild = Titelbild)
+                    </label>
+                    <span className="text-[10px] text-gray-500">{editingListing.images.length} Bilder hochgeladen</span>
+                  </div>
 
-                  {/* Vorschaubilder-Liste */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Vorschaubilder-Liste mit Steuerungs-Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {editingListing.images.map((imgUrl, index) => (
-                      <div key={index} className="relative group bg-white border rounded-xl overflow-hidden p-1 shadow-sm">
-                        <img src={imgUrl} alt="" className="w-full h-20 object-cover rounded-lg" />
+                      <div key={index} className={`relative flex items-center gap-3 bg-white border rounded-xl p-2 shadow-sm ${index === 0 ? 'border-2 border-[#86b817] bg-[#86b817]/5' : 'border-gray-200'}`}>
+                        
+                        {/* Bildvorschau */}
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <img src={imgUrl} alt="" className="w-full h-full object-cover rounded-lg border" />
+                          {index === 0 && (
+                            <span className="absolute -top-2 -left-2 bg-[#86b817] text-[#22262d] text-[9px] font-black px-1.5 py-0.5 rounded-full shadow">
+                              Titelbild
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Steuerungsoptionen */}
+                        <div className="flex-1 flex flex-col justify-between text-[11px]">
+                          <div className="font-bold text-gray-800">
+                            {index === 0 ? '⭐️ Haupt-Titelbild' : `Bild ${index + 1}`}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoveImage(index, 'left')}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md flex items-center gap-0.5 text-[10px] font-bold"
+                                title="Nach links / vor"
+                              >
+                                <ArrowLeft className="w-3 h-3" /> Vor
+                              </button>
+                            )}
+
+                            {index < editingListing.images.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleMoveImage(index, 'right')}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-md flex items-center gap-0.5 text-[10px] font-bold"
+                                title="Nach rechts / zurück"
+                              >
+                                Zurück <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {index !== 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetAsCover(index)}
+                                className="bg-[#86b817]/20 hover:bg-[#86b817]/30 text-[#22262d] px-2 py-1 rounded-md text-[10px] font-extrabold"
+                                title="Als Titelbild festlegen"
+                              >
+                                Als Titelbild
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Löschen-Button */}
                         <button
                           type="button"
                           onClick={() => {
                             const newImgs = editingListing.images.filter((_, i) => i !== index);
                             setEditingListing({ ...editingListing, images: newImgs.length ? newImgs : ['https://images.unsplash.com/photo-1506521781263-d8422e82f27a'] });
                           }}
-                          className="absolute top-2 right-2 bg-rose-600 text-white p-1 rounded-full text-[10px] hover:bg-rose-700 shadow"
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2 rounded-lg transition-colors"
                           title="Bild löschen"
                         >
-                          <X className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
@@ -277,7 +388,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <div>
                     <label className="cursor-pointer bg-white hover:bg-gray-100 border border-dashed border-gray-300 text-gray-700 font-bold px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
                       <Upload className="w-4 h-4 text-[#86b817]" />
-                      <span>Bilder vom Handy / PC auswählen</span>
+                      <span>Weitere Bilder vom Handy / PC hinzufügen</span>
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -316,14 +427,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {userListings.map(listing => (
                       <div key={listing.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-50 p-3.5 rounded-xl border border-gray-200 gap-3">
                         
-                        {/* Klick aufs Inserat öffnet die Detailseite */}
+                        {/* KLICK AUF BILD ODER NAME ÖFFNET DIREKT DIE BEARBEITEN-SEITE */}
                         <div 
-                          className="flex items-center gap-3 cursor-pointer flex-1"
-                          onClick={() => onSelectListingToView && onSelectListingToView(listing)}
+                          className="flex items-center gap-3 cursor-pointer flex-1 group"
+                          onClick={() => setEditingListing(listing)}
+                          title="Klicken zum Bearbeiten"
                         >
-                          <img src={listing.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                          <img 
+                            src={listing.images[0]} 
+                            alt="" 
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border group-hover:border-[#86b817] transition-all" 
+                          />
                           <div>
-                            <h4 className="font-extrabold text-gray-900 hover:text-[#86b817] transition-colors">{listing.title}</h4>
+                            <h4 className="font-extrabold text-gray-900 group-hover:text-[#86b817] transition-colors flex items-center gap-1.5">
+                              {listing.title}
+                              <Edit3 className="w-3 h-3 text-gray-400 group-hover:text-[#86b817] opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </h4>
                             <p className="text-gray-500 flex items-center gap-1">
                               <MapPin className="w-3 h-3 text-[#86b817]" /> {listing.city} • {listing.price} € / {listing.priceType}
                             </p>
