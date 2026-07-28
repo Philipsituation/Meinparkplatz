@@ -25,7 +25,7 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // NEU: Erweitert um 'auth' für die Anmeldeseite
+  // Active Page State ('home' | 'profil' | 'auth')
   const [activePage, setActivePage] = useState<'home' | 'profil' | 'auth'>('home');
 
   // Bookmarks State
@@ -54,7 +54,7 @@ export default function App() {
     sortBy: 'newest',
   });
 
-  // Active Modals State (AuthModal läuft jetzt über activePage)
+  // Active Modals State
   const [selectedListing, setSelectedListing] = useState<ParkingListing | null>(null);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
@@ -78,6 +78,18 @@ export default function App() {
 
   // Conversations List
   const [conversations, setConversations] = useState<Conversation[]>([]);
+
+  // Category Selection Handler (Exaktes Filtern nach den 5 Kategorien)
+  const handleSelectCategory = (categoryType: string) => {
+    setFilters(prev => ({
+      ...prev,
+      selectedType: categoryType,
+      searchQuery: '' // Textsuche zurücksetzen, damit der Filter greift
+    }));
+    setActivePage('home');
+    setShowBookmarksOnly(false);
+    showToast(`Kategorie-Filter aktiv 🎯`);
+  };
 
   // Toggle Bookmark
   const handleToggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -240,10 +252,16 @@ export default function App() {
     showToast(`Danke! Bewertet mit ${rating.toUpperCase()} ${rating === 'top' ? '😁' : rating === 'zufrieden' ? '🙂' : '🙁'}`);
   };
 
+  // Exakte Filter-Logik für Listings & Kategorien
   const filteredListings = useMemo(() => {
     return listings.filter(item => {
       if (showBookmarksOnly && !bookmarkedIds.includes(item.id)) return false;
       
+      // Exakter Kategorie-Typ Filter (Tiefgarage, Außenstellplatz, Wallbox, Garage, Wohnmobil)
+      if (filters.selectedType !== 'all') {
+        if (item.type !== filters.selectedType) return false;
+      }
+
       if (filters.searchQuery.trim()) {
         const q = filters.searchQuery.toLowerCase();
         const matchesTitle = item.title.toLowerCase().includes(q);
@@ -260,7 +278,6 @@ export default function App() {
         if (!matchesCity && !matchesZip) return false;
       }
 
-      if (filters.selectedType !== 'all' && item.type !== filters.selectedType) return false;
       if (filters.selectedPriceType !== 'all' && item.priceType !== filters.selectedPriceType) return false;
       if (filters.paymentMethod !== 'all' && !item.paymentMethods.includes(filters.paymentMethod as any)) return false;
       if (filters.vehicleType !== 'all' && !item.suitableVehicles.includes(filters.vehicleType as any)) return false;
@@ -320,7 +337,13 @@ export default function App() {
         onSearchSubmit={() => setActivePage('home')}
       />
 
-      {activePage === 'home' && <SloganBanner onOpenCreateListing={() => setIsCreateListingModalOpen(true)} />}
+      {/* SloganBanner erhält die Kategorie-Klick-Funktion */}
+      {activePage === 'home' && (
+        <SloganBanner 
+          onOpenCreateListing={() => setIsCreateListingModalOpen(true)} 
+          onSelectCategory={handleSelectCategory}
+        />
+      )}
 
       {activePage === 'home' && (
         <FilterBar
@@ -351,6 +374,25 @@ export default function App() {
               </div>
             )}
 
+            {/* Aktiver Kategoriefilter Hinweis & Reset-Button */}
+            {filters.selectedType !== 'all' && (
+              <div className="mb-4 bg-[#86b817]/10 border border-[#86b817]/30 p-3 rounded-xl flex items-center justify-between text-xs text-gray-800 font-bold">
+                <span className="flex items-center gap-2">
+                  <span>Aktive Kategorie:</span>
+                  <span className="bg-[#86b817] text-[#22262d] px-2.5 py-0.5 rounded-md uppercase tracking-wider text-[11px]">
+                    {filters.selectedType}
+                  </span>
+                  <span className="text-gray-500 font-normal">({filteredListings.length} Treffer)</span>
+                </span>
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, selectedType: 'all' }))}
+                  className="bg-white border border-gray-300 px-3 py-1 rounded-lg text-[11px] hover:bg-gray-100 shadow-sm transition-colors"
+                >
+                  Kategorie-Filter aufheben ✕
+                </button>
+              </div>
+            )}
+
             {viewMode === 'list' ? (
               <div>
                 {filteredListings.length === 0 ? (
@@ -358,15 +400,15 @@ export default function App() {
                     <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto text-2xl">
                       🔍
                     </div>
-                    <h3 className="font-extrabold text-gray-900 text-base">Keine Parkplätze gefunden</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      Passe deine Suche, PLZ oder den Umkreis an. Du kannst auch selbst einen Parkplatz anbieten!
+                    <h3 className="font-extrabold text-gray-900 text-base">Keine Parkplätze in dieser Kategorie</h3>
+                    <p className="text-xs text-gray-500 that leading-relaxed">
+                      Für diese Kategorie wurden aktuell keine passenden Inserate gefunden. Setze den Filter zurück oder biete selbst einen Parkplatz an!
                     </p>
                     <button
-                      onClick={() => setIsCreateListingModalOpen(true)}
+                      onClick={() => setFilters(prev => ({ ...prev, selectedType: 'all' }))}
                       className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-5 py-2.5 rounded-xl text-xs shadow"
                     >
-                      Parkplatz jetzt inserieren
+                      Filter zurücksetzen
                     </button>
                   </div>
                 ) : (
