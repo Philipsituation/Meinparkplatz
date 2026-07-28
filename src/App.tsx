@@ -16,7 +16,7 @@ import { Footer } from './components/Footer';
 import { AdBannerPlaceholder } from './components/AdBannerPlaceholder';
 import { initialListings } from './data/mockListings';
 import { ParkingListing, FilterState, Conversation, LegalModalType, SmileyRating } from './types';
-import { AlertCircle, CheckCircle, Heart, Search } from 'lucide-react';
+import { CheckCircle, Heart, ArrowLeft } from 'lucide-react';
 
 export default function App() {
   // Main Listings State
@@ -25,8 +25,10 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // Active Page State ('home' | 'profil' | 'auth')
-  const [activePage, setActivePage] = useState<'home' | 'profil' | 'auth'>('home');
+  // Active Page State (Erweitert um volle Seiten statt Pop-ups)
+  const [activePage, setActivePage] = useState<
+    'home' | 'profil' | 'auth' | 'createListing' | 'detail' | 'chat' | 'legal'
+  >('home');
 
   // Bookmarks State
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
@@ -54,10 +56,9 @@ export default function App() {
     sortBy: 'newest',
   });
 
-  // Active Modals State
+  // Selected Items for Full Pages
   const [selectedListing, setSelectedListing] = useState<ParkingListing | null>(null);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
 
@@ -82,26 +83,22 @@ export default function App() {
   // Zurück zur Startseite Handler
   const handleGoHome = () => {
     setActivePage('home');
-    setFilters(prev => ({
-      ...prev,
-      selectedType: 'all',
-      searchQuery: '',
-      locationQuery: '',
-    }));
+    setSelectedListing(null);
+    setActiveConversation(null);
     setShowBookmarksOnly(false);
-    showToast('Zurück zur Startseite 🏠');
   };
 
-  // Exakte Kategorie Auswahl Handler
+  // Exakte Kategorie Auswahl Handler (Kommt direkt zu den passenden Kategorien)
   const handleSelectCategory = (categoryType: string) => {
+    setActivePage('home');
+    setShowBookmarksOnly(false);
     setFilters(prev => ({
       ...prev,
       selectedType: categoryType,
-      searchQuery: '' 
+      searchQuery: '',
+      locationQuery: '',
     }));
-    setActivePage('home');
-    setShowBookmarksOnly(false);
-    showToast(`Kategorie-Filter aktiv 🎯`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // GUARD: Inserieren nur wenn eingeloggt UND E-Mail verifiziert
@@ -109,18 +106,17 @@ export default function App() {
     if (!currentUser) {
       showToast('🔒 Bitte melde dich zuerst an, um einen Parkplatz zu inserieren.');
       setActivePage('auth');
-      setIsCreateListingModalOpen(false);
       return;
     }
 
     if (!currentUser.isEmailVerified) {
       showToast('⚠️ Bitte bestätige zuerst deine E-Mail-Adresse, um Inserate zu erstellen.');
       setActivePage('profil');
-      setIsCreateListingModalOpen(false);
       return;
     }
 
-    setIsCreateListingModalOpen(true);
+    setActivePage('createListing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Toggle Bookmark
@@ -175,9 +171,10 @@ export default function App() {
 
     setListings(prev => [created, ...prev]);
     showToast('Anzeige erfolgreich veröffentlicht! 🎉');
+    handleGoHome();
   };
 
-  // Open Chat for a Listing
+  // Open Chat for a Listing (Ganze Seite)
   const handleOpenChatForListing = (listing: ParkingListing) => {
     let existing = conversations.find(c => c.listingId === listing.id);
     if (!existing) {
@@ -212,7 +209,8 @@ export default function App() {
       setConversations(prev => [existing!, ...prev]);
     }
     setActiveConversation(existing);
-    setSelectedListing(null);
+    setActivePage('chat');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Send Message in Active Conversation
@@ -266,6 +264,7 @@ export default function App() {
     setConversations(prev => prev.filter(c => c.id !== id));
     if (activeConversation?.id === id) {
       setActiveConversation(null);
+      setActivePage('home');
     }
     showToast('Chatverlauf gelöscht');
   };
@@ -277,7 +276,7 @@ export default function App() {
 
   const handleReportListing = (listingId: string) => {
     showToast('Anzeige & Profil zur Überprüfung an den Kundenservice gemeldet.');
-    setSelectedListing(null);
+    handleGoHome();
   };
 
   const handleSubmitRating = (rating: SmileyRating, tags: string[], comment: string) => {
@@ -346,15 +345,18 @@ export default function App() {
         setFilters={setFilters}
         onLogoClick={handleGoHome}
         onOpenCreateListing={handleOpenCreateListingGuard}
-        onOpenAuth={() => setActivePage('auth')}
-        onOpenProfile={() => setActivePage('profil')}
+        onOpenAuth={() => { setActivePage('auth'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        onOpenProfile={() => { setActivePage('profil'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
         onLogout={() => {
           setCurrentUser(null);
           showToast('Erfolgreich abgemeldet 👋');
+          handleGoHome();
         }}
         onOpenChat={() => {
           if (conversations.length > 0) {
             setActiveConversation(conversations[0]);
+            setActivePage('chat');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           } else {
             showToast('Keine aktiven Nachrichten vorhanden');
           }
@@ -370,25 +372,24 @@ export default function App() {
       />
 
       {activePage === 'home' && (
-        <SloganBanner 
-          onOpenCreateListing={handleOpenCreateListingGuard} 
-          onSelectCategory={handleSelectCategory}
-        />
-      )}
-
-      {activePage === 'home' && (
-        <FilterBar
-          filters={filters}
-          setFilters={setFilters}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          totalResults={filteredListings.length}
-        />
+        <>
+          <SloganBanner 
+            onOpenCreateListing={handleOpenCreateListingGuard} 
+            onSelectCategory={handleSelectCategory}
+          />
+          <FilterBar
+            filters={filters}
+            setFilters={setFilters}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            totalResults={filteredListings.length}
+          />
+        </>
       )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
-        {activePage === 'home' ? (
+        {activePage === 'home' && (
           <>
             {showBookmarksOnly && (
               <div className="mb-4 bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-center justify-between text-xs text-rose-900 font-bold">
@@ -447,7 +448,11 @@ export default function App() {
                       <ListingCard
                         key={listing.id}
                         listing={listing}
-                        onSelect={(l) => setSelectedListing(l)}
+                        onSelect={(l) => {
+                          setSelectedListing(l);
+                          setActivePage('detail');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
                         onToggleBookmark={handleToggleBookmark}
                         isBookmarked={bookmarkedIds.includes(listing.id)}
                       />
@@ -458,20 +463,80 @@ export default function App() {
             ) : (
               <MapView
                 listings={filteredListings}
-                onSelectListing={(l) => setSelectedListing(l)}
+                onSelectListing={(l) => {
+                  setSelectedListing(l);
+                  setActivePage('detail');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 radiusKm={filters.radiusKm}
               />
             )}
 
             <AdBannerPlaceholder />
           </>
-        ) : activePage === 'profil' ? (
+        )}
+
+        {activePage === 'detail' && selectedListing && (
+          <div className="pb-8 max-w-4xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
+            </button>
+            <ListingDetailModal
+              listing={selectedListing}
+              onClose={handleGoHome}
+              onOpenChat={handleOpenChatForListing}
+              onToggleBookmark={handleToggleBookmark}
+              isBookmarked={bookmarkedIds.includes(selectedListing.id)}
+              onOpenRateLandlord={handleOpenRateLandlordGuard}
+              onReportListing={handleReportListing}
+            />
+          </div>
+        )}
+
+        {activePage === 'chat' && activeConversation && (
+          <div className="pb-8 max-w-4xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+            <ChatModal
+              conversation={activeConversation}
+              onClose={handleGoHome}
+              onSendMessage={handleSendMessage}
+              onDeleteConversation={handleDeleteConversation}
+              onOpenRateLandlord={handleOpenRateLandlordGuard}
+            />
+          </div>
+        )}
+
+        {activePage === 'createListing' && (
           <div className="pb-8 max-w-3xl mx-auto">
             <button 
               onClick={handleGoHome}
-              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
             >
-              ← Zurück zur Startseite
+              <ArrowLeft className="w-4 h-4" /> Abbrechen & Zurück
+            </button>
+            <CreateListingModal
+              isOpen={true}
+              onClose={handleGoHome}
+              onSubmitListing={handleCreateListing}
+            />
+          </div>
+        )}
+
+        {activePage === 'profil' && (
+          <div className="pb-8 max-w-3xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
             </button>
             
             <ProfileModal
@@ -482,7 +547,10 @@ export default function App() {
               conversations={conversations}
               bookmarkedListings={listings.filter(l => bookmarkedIds.includes(l.id))}
               onDeleteListing={handleDeleteListing}
-              onOpenChatWithConversation={(conv) => setActiveConversation(conv)}
+              onOpenChatWithConversation={(conv) => {
+                setActiveConversation(conv);
+                setActivePage('chat');
+              }}
               onLogout={() => {
                 setCurrentUser(null);
                 handleGoHome();
@@ -495,13 +563,15 @@ export default function App() {
               }}
             />
           </div>
-        ) : (
+        )}
+
+        {activePage === 'auth' && (
           <div className="pb-8 max-w-md mx-auto">
             <button 
               onClick={handleGoHome}
-              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
             >
-              ← Zurück zur Startseite
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
             </button>
 
             <AuthModal
@@ -515,53 +585,39 @@ export default function App() {
             />
           </div>
         )}
+
+        {activePage === 'legal' && (
+          <div className="pb-8 max-w-3xl mx-auto">
+            <button 
+              onClick={handleGoHome}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur Startseite
+            </button>
+            <LegalPagesModal
+              type={activeLegalModal}
+              onClose={handleGoHome}
+            />
+          </div>
+        )}
       </main>
 
       <Footer
-        onOpenLegalModal={(type) => setActiveLegalModal(type)}
+        onOpenLegalModal={(type) => {
+          setActiveLegalModal(type);
+          setActivePage('legal');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onOpenCookieSettings={() => setIsCookieModalOpen(true)}
         onOpenCreateListing={handleOpenCreateListingGuard}
       />
 
-      {/* Modals */}
-      {selectedListing && (
-        <ListingDetailModal
-          listing={selectedListing}
-          onClose={() => setSelectedListing(null)}
-          onOpenChat={handleOpenChatForListing}
-          onToggleBookmark={handleToggleBookmark}
-          isBookmarked={bookmarkedIds.includes(selectedListing.id)}
-          onOpenRateLandlord={handleOpenRateLandlordGuard}
-          onReportListing={handleReportListing}
-        />
-      )}
-
-      {activeConversation && (
-        <ChatModal
-          conversation={activeConversation}
-          onClose={() => setActiveConversation(null)}
-          onSendMessage={handleSendMessage}
-          onDeleteConversation={handleDeleteConversation}
-          onOpenRateLandlord={handleOpenRateLandlordGuard}
-        />
-      )}
-
+      {/* Kleine verbleibende Hilfs-Modals (wie Cookie-Einstellungen oder Smiley-Rating) */}
       <SmileyRatingModal
         isOpen={rateModalData.isOpen}
         landlordName={rateModalData.landlordName}
         onClose={() => setRateModalData({ isOpen: false, landlordId: '', landlordName: '' })}
         onSubmitRating={handleSubmitRating}
-      />
-
-      <CreateListingModal
-        isOpen={isCreateListingModalOpen}
-        onClose={() => setIsCreateListingModalOpen(false)}
-        onSubmitListing={handleCreateListing}
-      />
-
-      <LegalPagesModal
-        type={activeLegalModal}
-        onClose={() => setActiveLegalModal(null)}
       />
 
       <CookieSettingsModal
