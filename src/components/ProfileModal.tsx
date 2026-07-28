@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ParkingListing, Conversation } from '../types';
-import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin } from 'lucide-react';
+import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin, Upload } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -10,8 +10,8 @@ interface ProfileModalProps {
   conversations: Conversation[];
   bookmarkedListings?: ParkingListing[];
   onDeleteListing: (id: string) => void;
-  onUpdateListing?: (updatedListing: ParkingListing) => void; // NEU: Zum Speichern der Bearbeitungen
-  onSelectListingToView?: (listing: ParkingListing) => void; // NEU: Öffnet das Inserat als Detailseite
+  onUpdateListing?: (updatedListing: ParkingListing) => void;
+  onSelectListingToView?: (listing: ParkingListing) => void;
   onOpenChatWithConversation: (conv: Conversation) => void;
   onLogout: () => void;
   onDeleteAccount: () => void;
@@ -72,6 +72,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setTimeout(() => setSuccessMessage(null), 3000);
     }
     setEditingListing(null);
+  };
+
+  // Funktion zum Hochladen von echten Bilddateien vom Handy/PC
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files.length || !editingListing) return;
+    
+    const files = Array.from(e.target.files);
+    const newImageUrls = files.map(file => URL.createObjectURL(file));
+
+    setEditingListing({
+      ...editingListing,
+      images: [...editingListing.images, ...newImageUrls]
+    });
   };
 
   return (
@@ -234,47 +247,46 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   />
                 </div>
 
-                {/* Bilder verwalten */}
-                <div className="space-y-2">
+                {/* Echte Bilder vom Handy/PC hochladen */}
+                <div className="space-y-3">
                   <label className="block font-bold text-gray-700 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#86b817]" /> Bilder-URLs verwalten
+                    <ImageIcon className="w-3.5 h-3.5 text-[#86b817]" /> Fotos verwalten (vom Gerät hochladen)
                   </label>
-                  {editingListing.images.map((imgUrl, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={imgUrl}
-                        onChange={(e) => {
-                          const newImgs = [...editingListing.images];
-                          newImgs[index] = e.target.value;
-                          setEditingListing({ ...editingListing, images: newImgs });
-                        }}
-                        className="flex-1 bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#86b817]"
+
+                  {/* Vorschaubilder-Liste */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {editingListing.images.map((imgUrl, index) => (
+                      <div key={index} className="relative group bg-white border rounded-xl overflow-hidden p-1 shadow-sm">
+                        <img src={imgUrl} alt="" className="w-full h-20 object-cover rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newImgs = editingListing.images.filter((_, i) => i !== index);
+                            setEditingListing({ ...editingListing, images: newImgs.length ? newImgs : ['https://images.unsplash.com/photo-1506521781263-d8422e82f27a'] });
+                          }}
+                          className="absolute top-2 right-2 bg-rose-600 text-white p-1 rounded-full text-[10px] hover:bg-rose-700 shadow"
+                          title="Bild löschen"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Upload-Button */}
+                  <div>
+                    <label className="cursor-pointer bg-white hover:bg-gray-100 border border-dashed border-gray-300 text-gray-700 font-bold px-4 py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                      <Upload className="w-4 h-4 text-[#86b817]" />
+                      <span>Bilder vom Handy / PC auswählen</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        onChange={handleImageUpload} 
+                        className="hidden" 
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newImgs = editingListing.images.filter((_, i) => i !== index);
-                          setEditingListing({ ...editingListing, images: newImgs.length ? newImgs : ['https://images.unsplash.com/photo-1506521781263-d8422e82f27a'] });
-                        }}
-                        className="bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-2 rounded-xl font-bold"
-                      >
-                        Löschen
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newUrl = prompt('Bitte Bild-URL (Link) eingeben:');
-                      if (newUrl) {
-                        setEditingListing({ ...editingListing, images: [...editingListing.images, newUrl] });
-                      }
-                    }}
-                    className="text-xs text-[#86b817] font-extrabold hover:underline"
-                  >
-                    + Weiteres Bild hinzufügen
-                  </button>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2 border-t">
