@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, User, Eye, MessageSquare, Euro, Trash2, ShieldCheck, Mail, AlertTriangle, List, CheckCircle, LogOut, Heart, Star, Clock, MapPin, Smile } from 'lucide-react';
 import { ParkingListing, Conversation } from '../types';
+import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, ArrowLeft, Settings, Star, ShieldCheck, Mail } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -17,7 +17,6 @@ interface ProfileModalProps {
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
-  onClose,
   currentUser,
   userListings,
   conversations,
@@ -29,346 +28,309 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  // Aktiver Reiter im Profil
   const [activeTab, setActiveTab] = useState<'listings' | 'chats' | 'bookmarks' | 'ratings' | 'settings'>('listings');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Einstellungs-Formular-Zustände
+  const [editName, setEditName] = useState(currentUser.name);
+  const [editEmail, setEditEmail] = useState(currentUser.email);
+  const [editZip, setEditZip] = useState(currentUser.zipCode);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Compute stats
-  const totalViews = userListings.reduce((sum, l) => sum + (l.viewsCount || 0), 0);
-  const totalInquiries = conversations.length;
-  const estimatedEarnings = userListings.reduce((sum, l) => sum + l.price * 3, 0);
+  const handleSaveProfileData = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuccessMessage('Kontodaten erfolgreich aktualisiert!');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleSavePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      alert('Bitte fülle alle Passwort-Felder aus.');
+      return;
+    }
+    setSuccessMessage('Passwort erfolgreich geändert!');
+    setCurrentPassword('');
+    setNewPassword('');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden border border-gray-200 my-auto flex flex-col max-h-[90vh]">
-        
-        {/* Profile Header */}
-        <div className="bg-[#22262d] text-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 border-b border-gray-800">
-          <div className="flex items-center gap-3.5">
-            <div className="w-13 h-13 rounded-2xl bg-[#86b817] text-[#22262d] font-black flex items-center justify-center text-2xl shadow-inner shrink-0">
-              {currentUser.name.charAt(0)}
-            </div>
-            <div>
-              <div className="font-extrabold text-lg text-white flex items-center gap-2">
-                <span>{currentUser.name}</span>
-                <span className="bg-[#86b817]/20 text-[#86b817] text-xs px-2 py-0.5 rounded-md border border-[#86b817]/30 font-bold flex items-center gap-1">
-                  😁 TOP Vermieter
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden text-xs text-gray-800">
+      
+      {/* Kopfbereich der Profilseite */}
+      <div className="bg-[#22262d] text-white px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-[#86b817] text-[#22262d] font-black rounded-2xl flex items-center justify-center text-lg shadow">
+            {currentUser.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h2 className="font-extrabold text-sm sm:text-base flex items-center gap-2">
+              {currentUser.name}
+              {currentUser.isEmailVerified && (
+                <span className="bg-[#86b817]/20 text-[#86b817] text-[10px] px-2 py-0.5 rounded-full border border-[#86b817]/40">
+                  Verifiziert ✓
                 </span>
-              </div>
-              <p className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                <span>{currentUser.email}</span>
-                <span>•</span>
-                <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3 text-[#86b817]" /> PLZ {currentUser.zipCode}</span>
-                <span>•</span>
-                <span className="text-gray-400">Mitglied seit Juli 2026</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button
-              onClick={() => {
-                onLogout();
-                onClose();
-              }}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 border border-gray-700 transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5 text-rose-400" />
-              <span>Abmelden</span>
-            </button>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-white rounded-lg">
-              <X className="w-5 h-5" />
-            </button>
+              )}
+            </h2>
+            <p className="text-[11px] text-gray-400">{currentUser.email} • PLZ: {currentUser.zipCode}</p>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 bg-gray-50 text-xs font-bold text-gray-700 shrink-0 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('listings')}
-            className={`px-4 py-3 shrink-0 transition-colors border-b-2 ${
-              activeTab === 'listings' ? 'bg-white text-[#86b817] border-[#86b817]' : 'border-transparent hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            📋 Meine Inserate ({userListings.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('chats')}
-            className={`px-4 py-3 shrink-0 transition-colors border-b-2 ${
-              activeTab === 'chats' ? 'bg-white text-[#86b817] border-[#86b817]' : 'border-transparent hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            💬 Nachrichten ({conversations.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('bookmarks')}
-            className={`px-4 py-3 shrink-0 transition-colors border-b-2 ${
-              activeTab === 'bookmarks' ? 'bg-white text-[#86b817] border-[#86b817]' : 'border-transparent hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            ❤️ Merkzettel ({bookmarkedListings.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('ratings')}
-            className={`px-4 py-3 shrink-0 transition-colors border-b-2 ${
-              activeTab === 'ratings' ? 'bg-white text-[#86b817] border-[#86b817]' : 'border-transparent hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            ⭐ Bewertungen
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-3 shrink-0 transition-colors border-b-2 ${
-              activeTab === 'settings' ? 'bg-white text-[#86b817] border-[#86b817]' : 'border-transparent hover:bg-gray-100 text-gray-600'
-            }`}
-          >
-            ⚙️ Konto & Logout
-          </button>
+        <button
+          onClick={onLogout}
+          className="bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-colors flex items-center gap-1.5"
+        >
+          <LogOut className="w-4 h-4" /> Abmelden
+        </button>
+      </div>
+
+      {successMessage && (
+        <div className="bg-[#86b817]/10 border-b border-[#86b817]/30 p-3 text-xs text-[#22262d] font-bold flex items-center gap-2 justify-center">
+          <CheckCircle className="w-4 h-4 text-[#86b817]" />
+          <span>{successMessage}</span>
         </div>
+      )}
 
-        {/* Tab Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-gray-50/50">
-          
-          {/* TAB 1: Meine Inserate */}
-          {activeTab === 'listings' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-gray-900 text-sm">Deine aktiven & inserierten Parkplätze</h3>
-                <span className="text-xs text-gray-500 font-medium">Insgesamt {totalViews} Aufrufe</span>
-              </div>
+      {/* Profil Navigation Tabs */}
+      <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('listings')}
+          className={`flex-1 min-w-[120px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+            activeTab === 'listings' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <span>🅿️ Inserate ({userListings.length})</span>
+        </button>
 
-              {userListings.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 border border-gray-200 text-center space-y-2">
-                  <p className="text-sm font-semibold text-gray-800">Du hast aktuell keine aktiven Inserate.</p>
-                  <p className="text-xs text-gray-500">
-                    Biete deinen freien Stellplatz oder deine Garage einfach an und verdiene Geld!
-                  </p>
-                </div>
-              ) : (
-                userListings.map((listing) => (
-                  <div key={listing.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
+        <button
+          onClick={() => setActiveTab('chats')}
+          className={`flex-1 min-w-[120px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+            activeTab === 'chats' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Chats ({conversations.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bookmarks')}
+          className={`flex-1 min-w-[120px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+            activeTab === 'bookmarks' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Heart className="w-3.5 h-3.5 text-rose-500 fill-current" />
+          <span>Merkzettel ({bookmarkedListings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ratings')}
+          className={`flex-1 min-w-[120px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+            activeTab === 'ratings' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
+          <span>Bewertungen</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex-1 min-w-[120px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+            activeTab === 'settings' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>Einstellungen</span>
+        </button>
+      </div>
+
+      {/* Tab-Inhalte als Seiten */}
+      <div className="p-6">
+        
+        {/* TAB 1: Meine Inserate */}
+        {activeTab === 'listings' && (
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">Meine Parkplatz-Angebote</h3>
+            {userListings.length === 0 ? (
+              <p className="text-gray-500 italic py-6 text-center">Du hast aktuell keine Parkplätze inseriert.</p>
+            ) : (
+              <div className="space-y-3">
+                {userListings.map(listing => (
+                  <div key={listing.id} className="flex items-center justify-between bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                     <div className="flex items-center gap-3">
-                      <img src={listing.images[0]} alt="preview" className="w-20 h-14 object-cover rounded-lg shrink-0" />
+                      <img src={listing.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
                       <div>
-                        <h4 className="font-bold text-xs sm:text-sm text-gray-900">{listing.title}</h4>
-                        <div className="text-xs text-gray-500 font-medium mt-0.5">
-                          <span className="font-extrabold text-emerald-700">{listing.price} €</span> ({listing.priceType}) • {listing.city}
-                        </div>
-                        <div className="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
-                          <span>👁️ {listing.viewsCount} Aufrufe</span>
-                          <span>•</span>
-                          <span className="text-emerald-700 font-bold">Aktiv online</span>
-                        </div>
+                        <h4 className="font-extrabold text-gray-900">{listing.title}</h4>
+                        <p className="text-gray-500">{listing.city} • {listing.price} € / {listing.priceType}</p>
                       </div>
                     </div>
-
                     <button
                       onClick={() => onDeleteListing(listing.id)}
-                      className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors self-end sm:self-auto"
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-rose-200 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Anzeige löschen</span>
+                      Löschen
                     </button>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: Chatverläufe / Nachrichten */}
-          {activeTab === 'chats' && (
-            <div className="space-y-3">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-700 shrink-0" />
-                <span>
-                  <strong>Datenschutz:</strong> Alle Chatverläufe und Kontaktdaten werden nach 14 Tagen inaktivität automatisch gelöscht.
-                </span>
+                ))}
               </div>
+            )}
+          </div>
+        )}
 
-              {conversations.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 border border-gray-200 text-center text-gray-500 text-sm">
-                  Keine aktiven Chatverläufe vorhanden.
-                </div>
-              ) : (
-                conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    onClick={() => {
-                      onOpenChatWithConversation(conv);
-                      onClose();
-                    }}
-                    className="bg-white border border-gray-200 hover:border-[#86b817] p-3.5 rounded-xl flex items-center justify-between cursor-pointer transition-all shadow-2xs group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#86b817] text-[#22262d] font-bold flex items-center justify-center shrink-0">
-                        {conv.landlordName.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-bold text-xs text-gray-900 group-hover:text-[#86b817] transition-colors">
-                          {conv.landlordName} • <span className="font-normal text-gray-500">{conv.listingTitle}</span>
-                        </div>
-                        <div className="text-[11px] text-gray-600 truncate max-w-md mt-0.5">{conv.lastMessage}</div>
-                      </div>
+        {/* TAB 2: Chats */}
+        {activeTab === 'chats' && (
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">Aktive Nachrichten & Anfragen</h3>
+            {conversations.length === 0 ? (
+              <p className="text-gray-500 italic py-6 text-center">Keine aktiven Nachrichten vorhanden.</p>
+            ) : (
+              <div className="space-y-3">
+                {conversations.map(conv => (
+                  <div key={conv.id} className="flex items-center justify-between bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+                    <div>
+                      <h4 className="font-extrabold text-gray-900">{conv.listingTitle}</h4>
+                      <p className="text-gray-500 truncate max-w-xs">{conv.lastMessage}</p>
                     </div>
-                    <span className="text-[11px] text-gray-400 font-mono shrink-0 ml-2">{conv.lastMessageTime}</span>
+                    <button
+                      onClick={() => onOpenChatWithConversation(conv)}
+                      className="bg-[#22262d] text-white hover:bg-black font-bold px-3.5 py-2 rounded-xl transition-colors"
+                    >
+                      Öffnen
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-          {/* TAB 3: Merkzettel */}
-          {activeTab === 'bookmarks' && (
-            <div className="space-y-3">
-              <h3 className="font-bold text-gray-900 text-sm">Deine gespeicherten Parkplätze</h3>
-              
-              {bookmarkedListings.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 border border-gray-200 text-center text-gray-500 text-xs">
-                  Dein Merkzettel ist leer. Klicke bei interessanten Parkplätzen auf das Herz ❤️, um sie hier zu speichern.
-                </div>
-              ) : (
-                bookmarkedListings.map((listing) => (
-                  <div key={listing.id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={listing.images[0]} alt="preview" className="w-14 h-11 object-cover rounded-lg" />
-                      <div>
-                        <h4 className="font-bold text-xs text-gray-900">{listing.title}</h4>
-                        <p className="text-[11px] text-gray-500">{listing.price} € ({listing.priceType}) • {listing.city}</p>
-                      </div>
+        {/* TAB 3: Merkzettel */}
+        {activeTab === 'bookmarks' && (
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">Deine gemerkten Parkplätze</h3>
+            {bookmarkedListings.length === 0 ? (
+              <p className="text-gray-500 italic py-6 text-center">Du hast noch keine Parkplätze auf deinem Merkzettel gespeichert.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {bookmarkedListings.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <img src={item.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                    <div>
+                      <h4 className="font-extrabold text-gray-900 truncate w-44">{item.title}</h4>
+                      <p className="text-gray-500">{item.price} € / {item.priceType}</p>
                     </div>
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: Bewertungen */}
+        {activeTab === 'ratings' && (
+          <div className="space-y-4">
+            <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">Erhaltene Smiley-Bewertungen</h3>
+            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 text-center space-y-2">
+              <div className="text-2xl">😁 Top Vermieter</div>
+              <p className="text-gray-500">Du hast bisher 5 Top-Bewertungen von Mietern erhalten.</p>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* TAB 4: Bewertungen */}
-          {activeTab === 'ratings' && (
-            <div className="space-y-4">
-              <div className="bg-white border border-gray-200 p-4 rounded-xl space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                  <div>
-                    <h4 className="font-bold text-sm text-gray-900">Dein Smiley-Bewertungsprofil</h4>
-                    <p className="text-xs text-gray-500">Transparente Zufriedenheit deiner Mieter & Vermieter</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-emerald-700 font-black text-base flex items-center gap-1">
-                      😁 100% Positiv
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-center pt-1">
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
-                    <div className="text-xl">😁</div>
-                    <div className="font-extrabold text-sm text-emerald-950 mt-0.5">5x TOP</div>
-                    <div className="text-[10px] text-emerald-800">Sehr zufrieden</div>
-                  </div>
-                  <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl">
-                    <div className="text-xl">🙂</div>
-                    <div className="font-extrabold text-sm text-blue-950 mt-0.5">0x Zufrieden</div>
-                    <div className="text-[10px] text-blue-800">Alles ok</div>
-                  </div>
-                  <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl">
-                    <div className="text-xl">🙁</div>
-                    <div className="font-extrabold text-sm text-gray-950 mt-0.5">0x Naja</div>
-                    <div className="text-[10px] text-gray-600">Verbesserbar</div>
-                  </div>
-                </div>
+        {/* TAB 5: Einstellungen (Kontodaten & Passwort) */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <h3 className="font-extrabold text-gray-900 text-sm border-b pb-2">Kontodaten & Sicherheit</h3>
+            
+            <form onSubmit={handleSaveProfileData} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+              <h4 className="font-extrabold text-gray-900 text-xs">Persönliche Informationen</h4>
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">Dein Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
+                />
               </div>
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">E-Mail-Adresse</label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
+                />
+              </div>
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">Wohnort / PLZ</label>
+                <input
+                  type="text"
+                  value={editZip}
+                  onChange={(e) => setEditZip(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-5 py-2.5 rounded-xl shadow transition-colors"
+              >
+                Änderungen speichern
+              </button>
+            </form>
+
+            <form onSubmit={handleSavePassword} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+              <h4 className="font-extrabold text-gray-900 text-xs">Passwort ändern</h4>
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">Aktuelles Passwort</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
+                />
+              </div>
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">Neues Passwort</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-[#86b817]"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-[#22262d] hover:bg-black text-white font-extrabold px-5 py-2.5 rounded-xl shadow transition-colors"
+              >
+                Neues Passwort festlegen
+              </button>
+            </form>
+
+            <div className="pt-4 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Möchtest du dein Konto wirklich unwiderruflich löschen?')) {
+                    onDeleteAccount();
+                  }
+                }}
+                className="text-rose-600 hover:text-rose-700 font-bold px-4 py-2 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> Konto unwiderruflich löschen
+              </button>
             </div>
-          )}
-
-          {/* TAB 5: Einstellungen & Abmelden */}
-          {activeTab === 'settings' && (
-            <div className="space-y-5">
-              <div className="bg-white border border-gray-200 p-4 rounded-xl space-y-3">
-                <h4 className="font-bold text-sm text-gray-900">Kontoinformationen</h4>
-                <div className="text-xs text-gray-700 space-y-1.5">
-                  <div className="flex justify-between border-b border-gray-100 pb-1">
-                    <span className="text-gray-500">Name / Inserent:</span>
-                    <strong>{currentUser.name}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-gray-100 pb-1">
-                    <span className="text-gray-500">E-Mail Adresse:</span>
-                    <strong>{currentUser.email}</strong>
-                  </div>
-                  <div className="flex justify-between border-b border-gray-100 pb-1">
-                    <span className="text-gray-500">Standort-PLZ:</span>
-                    <strong>{currentUser.zipCode}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">E-Mail Verifizierung:</span>
-                    <strong className="text-emerald-700">✓ Bestätigt</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Explicit Logout Button Box */}
-              <div className="bg-gray-100 border border-gray-300 p-4 rounded-xl flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-gray-900">Aus Deinem Konto abmelden</h4>
-                  <p className="text-xs text-gray-500">Beendet die Sitzung auf diesem Gerät.</p>
-                </div>
-                <button
-                  onClick={() => {
-                    onLogout();
-                    onClose();
-                  }}
-                  className="bg-[#22262d] hover:bg-black text-white font-extrabold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow"
-                >
-                  <LogOut className="w-4 h-4 text-rose-400" />
-                  <span>Jetzt Abmelden</span>
-                </button>
-              </div>
-
-              {/* Danger Zone: Profile Deletion */}
-              <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl space-y-3">
-                <div className="font-bold text-sm text-rose-950 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  <span>Konto & Daten löschen</span>
-                </div>
-                <p className="text-xs text-rose-800">
-                  Möchtest du dein Profil und alle damit verbundenen Inserate & Chatverläufe unwiderruflich löschen?
-                </p>
-
-                {!showDeleteConfirm ? (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs transition-colors shadow"
-                  >
-                    Profil unwiderruflich löschen
-                  </button>
-                ) : (
-                  <div className="p-3 bg-white border border-rose-300 rounded-lg space-y-2">
-                    <p className="text-xs font-bold text-rose-900">Bist du absolut sicher?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          onDeleteAccount();
-                          onClose();
-                        }}
-                        className="bg-rose-700 text-white font-extrabold px-3 py-1.5 rounded text-xs"
-                      >
-                        Ja, jetzt löschen
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="bg-gray-200 text-gray-800 font-bold px-3 py-1.5 rounded text-xs"
-                      >
-                        Abbrechen
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-
-        </div>
+          </div>
+        )}
 
       </div>
+
     </div>
   );
 };
-
