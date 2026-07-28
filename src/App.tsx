@@ -25,6 +25,9 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
+  // NEU: Seiten-Steuerung (Startseite vs Profil)
+  const [activePage, setActivePage] = useState<'home' | 'profil'>('home');
+
   // Bookmarks State (empty for new visitors)
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
@@ -56,7 +59,6 @@ export default function App() {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
 
@@ -134,7 +136,6 @@ export default function App() {
 
   // Open Chat for a Listing
   const handleOpenChatForListing = (listing: ParkingListing) => {
-    // Find existing or create new
     let existing = conversations.find(c => c.listingId === listing.id);
     if (!existing) {
       existing = {
@@ -195,7 +196,6 @@ export default function App() {
     setActiveConversation(updated);
     setConversations(prev => prev.map(c => c.id === updated.id ? updated : c));
 
-    // Simulated Auto Landlord Response
     setTimeout(() => {
       const landlordResponse = {
         id: `msg-${Date.now() + 1}`,
@@ -219,7 +219,6 @@ export default function App() {
     }, 1200);
   };
 
-  // Delete Conversation
   const handleDeleteConversation = (id: string) => {
     setConversations(prev => prev.filter(c => c.id !== id));
     if (activeConversation?.id === id) {
@@ -228,32 +227,24 @@ export default function App() {
     showToast('Chatverlauf gelöscht');
   };
 
-  // Delete User Listing
   const handleDeleteListing = (id: string) => {
     setListings(prev => prev.filter(l => l.id !== id));
     showToast('Anzeige gelöscht');
   };
 
-  // Report Listing
   const handleReportListing = (listingId: string) => {
     showToast('Anzeige & Profil zur Überprüfung an den Kundenservice gemeldet.');
     setSelectedListing(null);
   };
 
-  // Submit Rating
   const handleSubmitRating = (rating: SmileyRating, tags: string[], comment: string) => {
     showToast(`Danke! Bewertet mit ${rating.toUpperCase()} ${rating === 'top' ? '😁' : rating === 'zufrieden' ? '🙂' : '🙁'}`);
   };
 
-  // Filtered & Sorted Listings
   const filteredListings = useMemo(() => {
     return listings.filter(item => {
-      // Bookmarks filter
-      if (showBookmarksOnly && !bookmarkedIds.includes(item.id)) {
-        return false;
-      }
-
-      // Search query (title, description, city, zipCode)
+      if (showBookmarksOnly && !bookmarkedIds.includes(item.id)) return false;
+      
       if (filters.searchQuery.trim()) {
         const q = filters.searchQuery.toLowerCase();
         const matchesTitle = item.title.toLowerCase().includes(q);
@@ -263,7 +254,6 @@ export default function App() {
         if (!matchesTitle && !matchesDesc && !matchesCity && !matchesZip) return false;
       }
 
-      // Location / PLZ query
       if (filters.locationQuery.trim()) {
         const loc = filters.locationQuery.toLowerCase();
         const matchesCity = item.city.toLowerCase().includes(loc);
@@ -271,36 +261,20 @@ export default function App() {
         if (!matchesCity && !matchesZip) return false;
       }
 
-      // Type filter
-      if (filters.selectedType !== 'all' && item.type !== filters.selectedType) {
-        return false;
-      }
-
-      // Price type
-      if (filters.selectedPriceType !== 'all' && item.priceType !== filters.selectedPriceType) {
-        return false;
-      }
-
-      // Payment method
-      if (filters.paymentMethod !== 'all' && !item.paymentMethods.includes(filters.paymentMethod as any)) {
-        return false;
-      }
-
-      // Vehicle type
-      if (filters.vehicleType !== 'all' && !item.suitableVehicles.includes(filters.vehicleType as any)) {
-        return false;
-      }
+      if (filters.selectedType !== 'all' && item.type !== filters.selectedType) return false;
+      if (filters.selectedPriceType !== 'all' && item.priceType !== filters.selectedPriceType) return false;
+      if (filters.paymentMethod !== 'all' && !item.paymentMethods.includes(filters.paymentMethod as any)) return false;
+      if (filters.vehicleType !== 'all' && !item.suitableVehicles.includes(filters.vehicleType as any)) return false;
 
       return true;
     }).sort((a, b) => {
       if (filters.sortBy === 'price_asc') return a.price - b.price;
       if (filters.sortBy === 'price_desc') return b.price - a.price;
       if (filters.sortBy === 'distance') return (a.distanceKm || 0) - (b.distanceKm || 0);
-      return 0; // newest
+      return 0;
     });
   }, [listings, filters, showBookmarksOnly, bookmarkedIds]);
 
-  // Rate Landlord Guard (Requires prior chat contact to prevent fake reviews)
   const handleOpenRateLandlordGuard = (landlordId: string, landlordName: string) => {
     const hasChatContact = conversations.some(c => c.landlordId === landlordId);
     if (!hasChatContact) {
@@ -313,7 +287,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f4f4f6] flex flex-col text-gray-900 font-sans antialiased">
       
-      {/* Toast Feedback Banner */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-[#22262d] text-white px-4 py-3 rounded-xl shadow-2xl border border-[#86b817] flex items-center gap-2 text-xs font-bold animate-bounce">
           <CheckCircle className="w-4 h-4 text-[#86b817]" />
@@ -321,13 +294,12 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Kleinanzeigen Header */}
       <Header
         filters={filters}
         setFilters={setFilters}
         onOpenCreateListing={() => setIsCreateListingModalOpen(true)}
         onOpenAuth={() => setIsAuthModalOpen(true)}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenProfile={() => setActivePage('profil')} // <-- HIER IST DIE ÄNDERUNG
         onLogout={() => {
           setCurrentUser(null);
           showToast('Erfolgreich abgemeldet 👋');
@@ -346,10 +318,8 @@ export default function App() {
         onSearchSubmit={() => {}}
       />
 
-      {/* Slogan Banner */}
       <SloganBanner onOpenCreateListing={() => setIsCreateListingModalOpen(true)} />
 
-      {/* Filter Bar */}
       <FilterBar
         filters={filters}
         setFilters={setFilters}
@@ -358,73 +328,102 @@ export default function App() {
         totalResults={filteredListings.length}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
-        {/* Bookmarks Filter Active Banner */}
-        {showBookmarksOnly && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-center justify-between text-xs text-rose-900 font-bold">
-            <span className="flex items-center gap-1.5">
-              <Heart className="w-4 h-4 text-rose-500 fill-current" />
-              Zeige deinen Merkzettel ({filteredListings.length} gespeicherte Parkplätze)
-            </span>
-            <button
-              onClick={() => setShowBookmarksOnly(false)}
-              className="bg-white border border-rose-300 px-3 py-1 rounded-lg text-[11px] text-gray-800 hover:bg-rose-100"
-            >
-              Alle Anzeigen anzeigen
-            </button>
-          </div>
-        )}
-
-        {/* Content View: List / Grid vs Map */}
-        {viewMode === 'list' ? (
-          <div>
-            {filteredListings.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 space-y-4 my-8 max-w-md mx-auto shadow-sm">
-                <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto text-2xl">
-                  🔍
-                </div>
-                <h3 className="font-extrabold text-gray-900 text-base">Keine Parkplätze gefunden</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Passe deine Suche, PLZ oder den Umkreis an. Du kannst auch selbst einen Parkplatz anbieten!
-                </p>
+        {/* HIER WIRD JETZT GESTEUERT, WAS ANGEZEIGT WIRD */}
+        {activePage === 'home' ? (
+          <>
+            {showBookmarksOnly && (
+              <div className="mb-4 bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-center justify-between text-xs text-rose-900 font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Heart className="w-4 h-4 text-rose-500 fill-current" />
+                  Zeige deinen Merkzettel ({filteredListings.length} gespeicherte Parkplätze)
+                </span>
                 <button
-                  onClick={() => setIsCreateListingModalOpen(true)}
-                  className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-5 py-2.5 rounded-xl text-xs shadow"
+                  onClick={() => setShowBookmarksOnly(false)}
+                  className="bg-white border border-rose-300 px-3 py-1 rounded-lg text-[11px] text-gray-800 hover:bg-rose-100"
                 >
-                  Parkplatz jetzt inserieren
+                  Alle Anzeigen anzeigen
                 </button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredListings.map((listing) => (
-                  <ListingCard
-                    key={listing.id}
-                    listing={listing}
-                    onSelect={(l) => setSelectedListing(l)}
-                    onToggleBookmark={handleToggleBookmark}
-                    isBookmarked={bookmarkedIds.includes(listing.id)}
-                  />
-                ))}
-              </div>
             )}
-          </div>
+
+            {viewMode === 'list' ? (
+              <div>
+                {filteredListings.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 space-y-4 my-8 max-w-md mx-auto shadow-sm">
+                    <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto text-2xl">
+                      🔍
+                    </div>
+                    <h3 className="font-extrabold text-gray-900 text-base">Keine Parkplätze gefunden</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      Passe deine Suche, PLZ oder den Umkreis an. Du kannst auch selbst einen Parkplatz anbieten!
+                    </p>
+                    <button
+                      onClick={() => setIsCreateListingModalOpen(true)}
+                      className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-extrabold px-5 py-2.5 rounded-xl text-xs shadow"
+                    >
+                      Parkplatz jetzt inserieren
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredListings.map((listing) => (
+                      <ListingCard
+                        key={listing.id}
+                        listing={listing}
+                        onSelect={(l) => setSelectedListing(l)}
+                        onToggleBookmark={handleToggleBookmark}
+                        isBookmarked={bookmarkedIds.includes(listing.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <MapView
+                listings={filteredListings}
+                onSelectListing={(l) => setSelectedListing(l)}
+                radiusKm={filters.radiusKm}
+              />
+            )}
+
+            <AdBannerPlaceholder />
+          </>
         ) : (
-          /* Interactive Map View */
-          <MapView
-            listings={filteredListings}
-            onSelectListing={(l) => setSelectedListing(l)}
-            radiusKm={filters.radiusKm}
-          />
+          // DAS IST DEINE NEUE PROFIL-SEITE
+          <div className="pb-8">
+            <button 
+              onClick={() => setActivePage('home')}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              ← Zurück zur Startseite
+            </button>
+            
+            <ProfileModal
+              isOpen={true} 
+              onClose={() => setActivePage('home')} 
+              currentUser={currentUser || { name: 'Philip Schüßler', email: 'philip.s@parkplatz.de', isEmailVerified: true, zipCode: '60329' }}
+              userListings={listings.filter(l => l.landlord.id === 'usr-landlord-1' || l.landlord.id === 'usr-me')}
+              conversations={conversations}
+              bookmarkedListings={listings.filter(l => bookmarkedIds.includes(l.id))}
+              onDeleteListing={handleDeleteListing}
+              onOpenChatWithConversation={(conv) => setActiveConversation(conv)}
+              onLogout={() => {
+                setCurrentUser(null);
+                setActivePage('home');
+                showToast('Erfolgreich abgemeldet');
+              }}
+              onDeleteAccount={() => {
+                setCurrentUser(null);
+                setActivePage('home');
+                showToast('Konto und Daten wurden gelöscht');
+              }}
+            />
+          </div>
         )}
-
-        {/* Ad Placeholder Banner for Future Monetization */}
-        <AdBannerPlaceholder />
-
       </main>
 
-      {/* Footer */}
       <Footer
         onOpenLegalModal={(type) => setActiveLegalModal(type)}
         onOpenCookieSettings={() => setIsCookieModalOpen(true)}
@@ -473,25 +472,6 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           showToast(`Willkommen zurück, ${user.name}!`);
-        }}
-      />
-
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        currentUser={currentUser || { name: 'Philip Schüßler', email: 'philip.s@parkplatz.de', isEmailVerified: true, zipCode: '60329' }}
-        userListings={listings.filter(l => l.landlord.id === 'usr-landlord-1' || l.landlord.id === 'usr-me')}
-        conversations={conversations}
-        bookmarkedListings={listings.filter(l => bookmarkedIds.includes(l.id))}
-        onDeleteListing={handleDeleteListing}
-        onOpenChatWithConversation={(conv) => setActiveConversation(conv)}
-        onLogout={() => {
-          setCurrentUser(null);
-          showToast('Erfolgreich abgemeldet');
-        }}
-        onDeleteAccount={() => {
-          setCurrentUser(null);
-          showToast('Konto und Daten wurden gelöscht');
         }}
       />
 
