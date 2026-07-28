@@ -25,14 +25,14 @@ export default function App() {
   // View Mode: List vs Map
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
-  // NEU: Seiten-Steuerung (Startseite vs Profil)
-  const [activePage, setActivePage] = useState<'home' | 'profil'>('home');
+  // NEU: Erweitert um 'auth' für die Anmeldeseite
+  const [activePage, setActivePage] = useState<'home' | 'profil' | 'auth'>('home');
 
-  // Bookmarks State (empty for new visitors)
+  // Bookmarks State
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
 
-  // Active User State (null = ausgeloggt / Gast)
+  // Active User State
   const [currentUser, setCurrentUser] = useState<{
     name: string;
     email: string;
@@ -54,10 +54,9 @@ export default function App() {
     sortBy: 'newest',
   });
 
-  // Active Modals State
+  // Active Modals State (AuthModal läuft jetzt über activePage)
   const [selectedListing, setSelectedListing] = useState<ParkingListing | null>(null);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCreateListingModalOpen, setIsCreateListingModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType>(null);
   const [isCookieModalOpen, setIsCookieModalOpen] = useState(false);
@@ -77,7 +76,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Conversations List (empty for new visitors)
+  // Conversations List
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   // Toggle Bookmark
@@ -298,8 +297,8 @@ export default function App() {
         filters={filters}
         setFilters={setFilters}
         onOpenCreateListing={() => setIsCreateListingModalOpen(true)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onOpenProfile={() => setActivePage('profil')} // <-- HIER IST DIE ÄNDERUNG
+        onOpenAuth={() => setActivePage('auth')}
+        onOpenProfile={() => setActivePage('profil')}
         onLogout={() => {
           setCurrentUser(null);
           showToast('Erfolgreich abgemeldet 👋');
@@ -311,26 +310,30 @@ export default function App() {
             showToast('Keine aktiven Nachrichten vorhanden');
           }
         }}
-        onOpenBookmarks={() => setShowBookmarksOnly(!showBookmarksOnly)}
+        onOpenBookmarks={() => {
+          setActivePage('home');
+          setShowBookmarksOnly(!showBookmarksOnly);
+        }}
         unreadChatsCount={conversations.reduce((sum, c) => sum + c.unreadCount, 0)}
         bookmarkedCount={bookmarkedIds.length}
         currentUser={currentUser}
-        onSearchSubmit={() => {}}
+        onSearchSubmit={() => setActivePage('home')}
       />
 
-      <SloganBanner onOpenCreateListing={() => setIsCreateListingModalOpen(true)} />
+      {activePage === 'home' && <SloganBanner onOpenCreateListing={() => setIsCreateListingModalOpen(true)} />}
 
-      <FilterBar
-        filters={filters}
-        setFilters={setFilters}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        totalResults={filteredListings.length}
-      />
+      {activePage === 'home' && (
+        <FilterBar
+          filters={filters}
+          setFilters={setFilters}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          totalResults={filteredListings.length}
+        />
+      )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
         
-        {/* HIER WIRD JETZT GESTEUERT, WAS ANGEZEIGT WIRD */}
         {activePage === 'home' ? (
           <>
             {showBookmarksOnly && (
@@ -390,9 +393,8 @@ export default function App() {
 
             <AdBannerPlaceholder />
           </>
-        ) : (
-          // DAS IST DEINE NEUE PROFIL-SEITE
-          <div className="pb-8">
+        ) : activePage === 'profil' ? (
+          <div className="pb-8 max-w-3xl mx-auto">
             <button 
               onClick={() => setActivePage('home')}
               className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
@@ -418,6 +420,25 @@ export default function App() {
                 setCurrentUser(null);
                 setActivePage('home');
                 showToast('Konto und Daten wurden gelöscht');
+              }}
+            />
+          </div>
+        ) : (
+          <div className="pb-8 max-w-md mx-auto">
+            <button 
+              onClick={() => setActivePage('home')}
+              className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              ← Zurück zur Startseite
+            </button>
+
+            <AuthModal
+              isOpen={true}
+              onClose={() => setActivePage('home')}
+              onLoginSuccess={(user) => {
+                setCurrentUser(user);
+                setActivePage('home');
+                showToast(`Willkommen, ${user.name}!`);
               }}
             />
           </div>
@@ -464,15 +485,6 @@ export default function App() {
         isOpen={isCreateListingModalOpen}
         onClose={() => setIsCreateListingModalOpen(false)}
         onSubmitListing={handleCreateListing}
-      />
-
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onLoginSuccess={(user) => {
-          setCurrentUser(user);
-          showToast(`Willkommen zurück, ${user.name}!`);
-        }}
       />
 
       <LegalPagesModal
