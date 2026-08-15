@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ParkingListing, Conversation } from '../types';
-import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin, Upload, ArrowLeft, ArrowRight, Home } from 'lucide-react';
+import { User, MessageSquare, Heart, Trash2, LogOut, CheckCircle, Settings, Star, Edit3, Save, X, Image as ImageIcon, MapPin, Upload, ArrowLeft, ArrowRight, Home, Database, Copy, Check, ShieldAlert, Key, Server, Loader2 } from 'lucide-react';
+import { updateSupabaseProfile, updateSupabasePassword, SUPABASE_SQL_SCHEMA_SCRIPT, isSupabaseConfigured, config as supabaseConfig } from '../lib/supabase';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ProfileModalProps {
   onLogout: () => void;
   onDeleteAccount: () => void;
   onGoHome?: () => void; // Neu: Funktion um zum Startbildschirm zurückzukehren
+  onUpdateCurrentUser?: (updated: { name: string; email: string; isEmailVerified: boolean; zipCode: string }) => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -31,11 +33,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLogout,
   onDeleteAccount,
   onGoHome,
+  onUpdateCurrentUser,
 }) => {
   if (!isOpen) return null;
 
   // Aktiver Reiter im Profil
-  const [activeTab, setActiveTab] = useState<'listings' | 'chats' | 'bookmarks' | 'ratings' | 'settings'>('listings');
+  const [activeTab, setActiveTab] = useState<'listings' | 'chats' | 'bookmarks' | 'ratings' | 'settings' | 'database'>('listings');
   
   // Bearbeitungs-State für ein Inserat
   const [editingListing, setEditingListing] = useState<ParkingListing | null>(null);
@@ -46,24 +49,63 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [editZip, setEditZip] = useState(currentUser.zipCode);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
 
-  const handleSaveProfileData = (e: React.FormEvent) => {
+  const handleSaveProfileData = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccessMessage('Kontodaten erfolgreich aktualisiert!');
-    setTimeout(() => setSuccessMessage(null), 3000);
+    setIsUpdating(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const res = await updateSupabaseProfile(editName.trim(), editZip.trim());
+    setIsUpdating(false);
+
+    if (res.error) {
+      setErrorMessage(`Fehler beim Speichern: ${res.error}`);
+    } else {
+      if (onUpdateCurrentUser) {
+        onUpdateCurrentUser({
+          ...currentUser,
+          name: editName.trim(),
+          zipCode: editZip.trim(),
+        });
+      }
+      setSuccessMessage('Kontodaten erfolgreich in Supabase aktualisiert!');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    }
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      alert('Bitte fülle alle Passwort-Felder aus.');
+    if (!newPassword || newPassword.length < 6) {
+      setErrorMessage('Das neue Passwort muss mindestens 6 Zeichen lang sein.');
       return;
     }
-    setSuccessMessage('Passwort erfolgreich geändert!');
-    setCurrentPassword('');
-    setNewPassword('');
-    setTimeout(() => setSuccessMessage(null), 3000);
+
+    setIsUpdating(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const res = await updateSupabasePassword(newPassword);
+    setIsUpdating(false);
+
+    if (res.error) {
+      setErrorMessage(`Fehler beim Ändern des Passworts: ${res.error}`);
+    } else {
+      setSuccessMessage('Passwort erfolgreich in Supabase geändert!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setTimeout(() => setSuccessMessage(null), 3500);
+    }
+  };
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA_SCRIPT);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -83,7 +125,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const files = Array.from(e.target.files);
 
     Promise.all(
-      files.map((file) => {
+      files.map((file: File) => {
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {
@@ -229,6 +271,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <Settings className="w-3.5 h-3.5" />
           <span>Einstellungen</span>
         </button>
+
+        {/* Entwickler / Admin-Tab nur für Inhaber/Philip Schüßler */}
+        {currentUser.email === 'philip.s@meinparkplatz.de' && (
+          <button
+            onClick={() => { setActiveTab('database'); setEditingListing(null); }}
+            className={`flex-1 min-w-[150px] py-3.5 px-4 font-bold text-center border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+              activeTab === 'database' ? 'border-[#86b817] text-[#22262d] bg-white' : 'border-transparent text-emerald-600 hover:text-emerald-800'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Admin: DB & SQL</span>
+          </button>
+        )}
       </div>
 
       {/* Tab-Inhalte als Seiten */}
@@ -623,6 +678,108 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               >
                 <Trash2 className="w-4 h-4" /> Konto unwiderruflich löschen
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: Datenbank & Sicherheit (Supabase RLS & Tabellen) */}
+        {activeTab === 'database' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-600" />
+                  Supabase Cloud-Datenbank & Sicherheitsregeln (RLS)
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Status, Tabellen-Schema & Datenschutz-Richtlinien (Row Level Security)
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                  Supabase Verbunden
+                </span>
+              </div>
+            </div>
+
+            {/* Sicherheits-Check Übersicht */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xl space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-900 font-extrabold text-xs">
+                  <ShieldAlert className="w-4 h-4 text-emerald-600" />
+                  <span>Row Level Security (RLS)</span>
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  Aktiviert: Nur Inhaber können eigene Inserate ändern/löschen. Alle anderen Nutzer haben nur Lesezugriff.
+                </p>
+              </div>
+
+              <div className="bg-blue-50/70 border border-blue-200 p-4 rounded-xl space-y-1">
+                <div className="flex items-center gap-1.5 text-blue-900 font-extrabold text-xs">
+                  <Key className="w-4 h-4 text-blue-600" />
+                  <span>Supabase Auth</span>
+                </div>
+                <p className="text-[11px] text-blue-800">
+                  Verschlüsselte Passwörter (Bcrypt/Argon2) und JWT-Sicherheitstoken für jede Session.
+                </p>
+              </div>
+
+              <div className="bg-amber-50/70 border border-amber-200 p-4 rounded-xl space-y-1">
+                <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-xs">
+                  <Server className="w-4 h-4 text-amber-600" />
+                  <span>Cloud Persistence</span>
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  Inserate, Profile und Nachrichten werden zentral gespeichert und sind geräteübergreifend verfügbar.
+                </p>
+              </div>
+            </div>
+
+            {/* SQL Schema Einrichtung */}
+            <div className="bg-gray-900 text-gray-100 rounded-2xl p-5 space-y-4 shadow-lg border border-gray-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+                <div>
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
+                    <span>1-Klick SQL-Setup für Dein Supabase Dashboard</span>
+                  </h4>
+                  <p className="text-[11px] text-gray-400">
+                    Erstellt automatisch die Tabellen <code className="text-emerald-400">profiles</code>, <code className="text-emerald-400">listings</code>, <code className="text-emerald-400">bookmarks</code> und alle RLS-Sicherheitsregeln.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopySql}
+                  className="bg-[#86b817] hover:bg-[#74a312] text-[#22262d] font-black px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow"
+                >
+                  {copiedSql ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>SQL kopiert! ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>SQL Skript kopieren</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Kurzanleitung */}
+              <div className="bg-gray-800/80 p-3.5 rounded-xl border border-gray-700 text-[11px] space-y-1.5 text-gray-300">
+                <strong className="text-white block font-bold">So wendest du das Skript in Supabase an:</strong>
+                <ol className="list-decimal list-inside space-y-1 text-gray-300">
+                  <li>Öffne dein Supabase Dashboard (<a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-emerald-400 underline">supabase.com/dashboard</a>)</li>
+                  <li>Klicke links im Menü auf <strong>SQL Editor</strong></li>
+                  <li>Klicke auf <strong>New Query</strong>, füge den kopierten Code ein und klicke auf <strong>Run</strong></li>
+                </ol>
+              </div>
+
+              {/* Code Preview Box */}
+              <pre className="bg-black/80 p-4 rounded-xl text-[10px] font-mono text-emerald-400 overflow-x-auto max-h-56 border border-gray-800">
+                {SUPABASE_SQL_SCHEMA_SCRIPT}
+              </pre>
             </div>
           </div>
         )}
